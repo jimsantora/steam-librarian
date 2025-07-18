@@ -25,6 +25,7 @@ help:
 	@echo "  test           - Run tests"
 	@echo "  test-verbose   - Run tests with verbose output"
 	@echo "  test-coverage  - Run tests with coverage report"
+	@echo "  test-steam-api - Test Steam API integration with real data"
 	@echo "  lint           - Run linter (requires golangci-lint)"
 	@echo ""
 	@echo "Building:"
@@ -155,6 +156,16 @@ test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+.PHONY: test-steam-api
+test-steam-api:
+	@echo "Testing Steam API integration..."
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs) && go run cmd/test-steam-api/main.go; \
+	else \
+		echo "No .env file found. Set STEAM_API_KEY environment variable."; \
+		go run cmd/test-steam-api/main.go; \
+	fi
 
 .PHONY: lint
 lint:
