@@ -1,0 +1,44 @@
+# Development docker-compose file with SQLite for simpler setup
+version: '3.8'
+
+services:
+  # Steam Librarian Combined Server (Web + MCP)
+  steam-librarian:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+      target: combined
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_TYPE=sqlite
+      - DATABASE_FILE_PATH=/data/steam_librarian.db
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+      - SERVER_ENVIRONMENT=development
+      - LOGGING_LEVEL=debug
+      - MCP_ENABLED=true
+    volumes:
+      - ./configs:/root/configs
+      - steam_dev_data:/data
+      - ../../web:/root/web  # Mount web assets for live reload
+    networks:
+      - steam_dev_network
+    restart: unless-stopped
+
+  # Redis for development (optional)
+  redis-dev:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - steam_dev_network
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+volumes:
+  steam_dev_data:
+    driver: local
+
+networks:
+  steam_dev_network:
+    driver: bridge

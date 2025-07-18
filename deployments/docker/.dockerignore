@@ -1,0 +1,45 @@
+# Build artifacts
+web-server
+mcp-server
+*.db
+
+# Development files
+.git
+.gitignore
+README.md
+.env
+.env.local
+
+# Documentation
+docs/
+*.md
+
+# Test files
+*_test.go
+test/
+coverage.out
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Deployment files (except docker)
+deployments/helm/
+deployments/k8s/
+
+# CI/CD files
+.github/

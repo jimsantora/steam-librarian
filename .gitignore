@@ -1,0 +1,107 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build output
+web-server
+mcp-server
+steam-librarian
+main
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Local configuration files
+configs/config.local.yaml
+configs/*.local.yaml
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Docker volumes and data
+data/
+docker-data/
+
+# Kubernetes secrets and configs
+secrets.yaml
+*-secrets.yaml
+
+# Helm charts dependencies and packages
+deployments/helm/*/charts/
+deployments/helm/*/Chart.lock
+*.tgz
+
+# Local development files
+air_tmp/
+.air.toml
+
+# Backup files
+*.bak
+*.backup
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# node_modules (in case of any frontend development)
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Local override files
+docker-compose.override.yml

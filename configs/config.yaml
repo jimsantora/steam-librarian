@@ -1,0 +1,91 @@
+# Steam Librarian Configuration File
+# This file contains the default configuration for the Steam Librarian application
+# Environment variables can override any setting using the pattern: SECTION_SETTING
+# For example: DATABASE_TYPE=postgres or STEAM_API_KEY=your_key_here
+
+server:
+  address: "localhost:8080"
+  port: 8080
+  environment: "development"  # development or production
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+
+database:
+  # Database type: sqlite, postgres, or mysql
+  type: "sqlite"
+  
+  # SQLite configuration (when type is sqlite)
+  file_path: "steam_librarian.db"
+  
+  # PostgreSQL/MySQL configuration (when type is postgres or mysql)
+  host: "localhost"
+  port: 5432
+  username: "steam_librarian"
+  password: ""
+  database: "steam_librarian"
+  ssl_mode: "disable"  # For PostgreSQL: disable, require, verify-ca, verify-full
+  timezone: "UTC"      # For MySQL
+  
+  # Connection pool settings
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "1h"
+
+steam:
+  # Your Steam API key - REQUIRED
+  # Get one from: https://steamcommunity.com/dev/apikey
+  # Can be set via environment variable: STEAM_API_KEY
+  api_key: ""
+  
+  # API rate limiting (Steam allows 100,000 calls per day)
+  rate_limit: 200        # Requests per minute
+  request_timeout: "30s"
+  max_retries: 3
+  
+  # Sync settings
+  sync_interval: "24h"   # How often to sync library data
+  batch_size: 10         # Number of games to process in one batch
+  
+  # Caching settings
+  enable_caching: true
+  cache_expiration: "6h"
+
+logging:
+  level: "info"          # debug, info, warn, error
+  format: "json"         # json or text
+  output: "stdout"       # stdout, stderr, or file path
+  
+  # Log rotation settings (when output is a file)
+  max_size: 100          # Maximum size in MB before rotation
+  max_backups: 3         # Maximum number of old log files to retain
+  max_age: 28            # Maximum age in days to retain old log files
+  compress: true         # Compress rotated log files
+
+mcp:
+  enabled: true
+  server_name: "steam-librarian"
+  server_version: "0.1.0"
+  protocol_version: "2024-11-05"
+  timeout: "30s"
+  buffer_size: 4096
+
+# Example production configuration (commented out)
+# To use these settings in production, uncomment and modify as needed:
+
+# server:
+#   address: "0.0.0.0:8080"
+#   environment: "production"
+
+# database:
+#   type: "postgres"
+#   host: "db.example.com"
+#   port: 5432
+#   username: "steam_librarian"
+#   password: "${DATABASE_PASSWORD}"  # Use environment variable
+#   database: "steam_librarian_prod"
+#   ssl_mode: "require"
+
+# logging:
+#   level: "warn"
+#   output: "/var/log/steam-librarian/app.log"

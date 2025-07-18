@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Steam Librarian Web Server
+  web:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+      target: web-server
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_TYPE=postgres
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=steam_librarian
+      - DATABASE_PASSWORD=steam_password
+      - DATABASE_DATABASE=steam_librarian
+      - DATABASE_SSL_MODE=disable
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+      - SERVER_ENVIRONMENT=development
+      - LOGGING_LEVEL=debug
+    volumes:
+      - ./configs:/root/configs
+      - steam_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - steam_network
+    restart: unless-stopped
+
+  # Steam Librarian MCP Server
+  mcp:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+      target: mcp-server
+    environment:
+      - DATABASE_TYPE=postgres
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=steam_librarian
+      - DATABASE_PASSWORD=steam_password
+      - DATABASE_DATABASE=steam_librarian
+      - DATABASE_SSL_MODE=disable
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+      - MCP_ENABLED=true
+      - LOGGING_LEVEL=debug
+    volumes:
+      - ./configs:/root/configs
+      - steam_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - steam_network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=steam_librarian
+      - POSTGRES_USER=steam_librarian
+      - POSTGRES_PASSWORD=steam_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - steam_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U steam_librarian -d steam_librarian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis (for future caching and rate limiting)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - steam_network
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - web
+    networks:
+      - steam_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  steam_data:
+    driver: local
+
+networks:
+  steam_network:
+    driver: bridge
