@@ -24,6 +24,8 @@ require (
 	gorm.io/gorm v1.25.5
 )
 
+require golang.org/x/time v0.3.0
+
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
