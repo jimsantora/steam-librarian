@@ -8,23 +8,28 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jimsantora/steam-librarian/internal/models"
+	"github.com/jimsantora/steam-librarian/internal/services"
 	"github.com/jimsantora/steam-librarian/internal/storage"
 	"github.com/jimsantora/steam-librarian/internal/steam"
 )
 
 // Handlers contains all HTTP handlers for the web interface
 type Handlers struct {
-	repo     *storage.Repository
-	steamAPI *steam.APIService
-	logger   *logrus.Logger
+	repo         *storage.Repository
+	steamAPI     *steam.APIService
+	syncService  *services.LibrarySyncService
+	syncScheduler *services.SyncScheduler
+	logger       *logrus.Logger
 }
 
 // NewHandlers creates a new handlers instance
-func NewHandlers(repo *storage.Repository, steamAPI *steam.APIService, logger *logrus.Logger) *Handlers {
+func NewHandlers(repo *storage.Repository, steamAPI *steam.APIService, syncService *services.LibrarySyncService, syncScheduler *services.SyncScheduler, logger *logrus.Logger) *Handlers {
 	return &Handlers{
-		repo:     repo,
-		steamAPI: steamAPI,
-		logger:   logger,
+		repo:         repo,
+		steamAPI:     steamAPI,
+		syncService:  syncService,
+		syncScheduler: syncScheduler,
+		logger:       logger,
 	}
 }
 
@@ -144,9 +149,50 @@ func (h *Handlers) SyncLibrary(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement library sync logic
-	h.logger.WithField("library_id", id).Info("Library sync requested - not yet implemented")
-	c.JSON(http.StatusAccepted, gin.H{"message": "Library sync started"})
+	// Get library to find Steam User ID
+	library, err := h.repo.GetLibraryByID(uint(id))
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get library")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get library"})
+		return
+	}
+
+	if library == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Library not found"})
+		return
+	}
+
+	// Get sync type from query parameter (default to incremental)
+	syncType := c.DefaultQuery("type", "incremental")
+	var syncTypeEnum services.SyncType
+	switch syncType {
+	case "full":
+		syncTypeEnum = services.SyncTypeFull
+	case "incremental":
+		syncTypeEnum = services.SyncTypeIncremental
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sync type. Use 'full' or 'incremental'"})
+		return
+	}
+
+	// Start sync
+	progress, err := h.syncService.SyncLibraryAsync(library.SteamUserID, syncTypeEnum)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to start library sync")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"library_id": id,
+		"steam_user_id": library.SteamUserID,
+		"sync_type": syncType,
+	}).Info("Library sync started")
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message": "Library sync started",
+		"progress": progress,
+	})
 }
 
 // Game Handlers
@@ -237,9 +283,198 @@ func (h *Handlers) SyncGame(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement game sync logic
+	// TODO: Implement individual game sync logic
 	h.logger.WithField("game_id", id).Info("Game sync requested - not yet implemented")
 	c.JSON(http.StatusAccepted, gin.H{"message": "Game sync started"})
+}
+
+// Sync Status Handlers
+
+// GetSyncProgress returns the current sync progress for a library
+func (h *Handlers) GetSyncProgress(c *gin.Context) {
+	steamUserID := c.Query("steam_user_id")
+	if steamUserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "steam_user_id query parameter is required"})
+		return
+	}
+
+	progress, exists := h.syncService.GetSyncProgress(steamUserID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active sync found for this user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"progress": progress})
+}
+
+// GetSyncHistory returns the sync history for a library
+func (h *Handlers) GetSyncHistory(c *gin.Context) {
+	steamUserID := c.Query("steam_user_id")
+	if steamUserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "steam_user_id query parameter is required"})
+		return
+	}
+
+	history := h.syncService.GetSyncHistory(steamUserID)
+	c.JSON(http.StatusOK, gin.H{"history": history})
+}
+
+// CancelSync cancels an active sync operation
+func (h *Handlers) CancelSync(c *gin.Context) {
+	steamUserID := c.Query("steam_user_id")
+	if steamUserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "steam_user_id query parameter is required"})
+		return
+	}
+
+	err := h.syncService.CancelSync(steamUserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Sync cancelled successfully"})
+}
+
+// GetActiveSyncs returns all currently active sync operations
+func (h *Handlers) GetActiveSyncs(c *gin.Context) {
+	activeSyncs := h.syncService.GetActiveSyncs()
+	c.JSON(http.StatusOK, gin.H{"active_syncs": activeSyncs})
+}
+
+// Scheduler Handlers
+
+// GetSchedulerStatus returns the current scheduler status and statistics
+func (h *Handlers) GetSchedulerStatus(c *gin.Context) {
+	status := h.syncScheduler.GetStatus()
+	c.JSON(http.StatusOK, gin.H{"scheduler": status})
+}
+
+// UpdateSchedulerConfig updates the scheduler configuration
+func (h *Handlers) UpdateSchedulerConfig(c *gin.Context) {
+	var config services.SchedulerConfig
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.syncScheduler.UpdateConfig(&config); err != nil {
+		h.logger.WithError(err).Error("Failed to update scheduler config")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update scheduler config"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Scheduler configuration updated successfully",
+		"config":  config,
+	})
+}
+
+// Conflict Resolution Handlers
+
+// GetConflicts returns conflicts based on optional filters
+func (h *Handlers) GetConflicts(c *gin.Context) {
+	conflictResolver := h.syncService.GetConflictResolver()
+	
+	statusParam := c.Query("status")
+	typeParam := c.Query("type")
+	
+	var status services.ConflictStatus
+	var conflictType services.ConflictType
+	
+	if statusParam != "" {
+		status = services.ConflictStatus(statusParam)
+	}
+	if typeParam != "" {
+		conflictType = services.ConflictType(typeParam)
+	}
+	
+	conflicts := conflictResolver.GetConflicts(status, conflictType)
+	
+	c.JSON(http.StatusOK, gin.H{
+		"conflicts": conflicts,
+		"count":     len(conflicts),
+		"filters": gin.H{
+			"status": statusParam,
+			"type":   typeParam,
+		},
+	})
+}
+
+// GetConflict returns a specific conflict by ID
+func (h *Handlers) GetConflict(c *gin.Context) {
+	conflictID := c.Param("id")
+	if conflictID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Conflict ID is required"})
+		return
+	}
+	
+	conflictResolver := h.syncService.GetConflictResolver()
+	conflict, exists := conflictResolver.GetConflictByID(conflictID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conflict not found"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"conflict": conflict})
+}
+
+// ResolveConflict resolves a specific conflict
+func (h *Handlers) ResolveConflict(c *gin.Context) {
+	conflictID := c.Param("id")
+	if conflictID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Conflict ID is required"})
+		return
+	}
+	
+	var request struct {
+		Strategy   services.ConflictResolutionStrategy `json:"strategy"`
+		ResolvedBy string                              `json:"resolved_by"`
+	}
+	
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	if request.ResolvedBy == "" {
+		request.ResolvedBy = "web-user" // Default value
+	}
+	
+	conflictResolver := h.syncService.GetConflictResolver()
+	if err := conflictResolver.ResolveConflict(conflictID, request.Strategy, request.ResolvedBy); err != nil {
+		h.logger.WithError(err).Error("Failed to resolve conflict")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Conflict resolved successfully",
+		"conflict_id": conflictID,
+		"strategy":    request.Strategy,
+		"resolved_by": request.ResolvedBy,
+	})
+}
+
+// AutoResolveConflicts triggers automatic conflict resolution
+func (h *Handlers) AutoResolveConflicts(c *gin.Context) {
+	conflictResolver := h.syncService.GetConflictResolver()
+	
+	if err := conflictResolver.AutoResolveConflicts(); err != nil {
+		h.logger.WithError(err).Error("Auto-resolution failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Auto-resolution failed"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"message": "Auto-resolution completed"})
+}
+
+// GetConflictStatistics returns conflict resolution statistics
+func (h *Handlers) GetConflictStatistics(c *gin.Context) {
+	conflictResolver := h.syncService.GetConflictResolver()
+	stats := conflictResolver.GetStatistics()
+	
+	c.JSON(http.StatusOK, gin.H{"statistics": stats})
 }
 
 // Search Handlers

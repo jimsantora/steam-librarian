@@ -233,3 +233,8 @@ func (s *APIService) GetLibraryStats(games []models.Game) map[string]interface{}
 func (s *APIService) ValidateAPIKey() error {
 	return s.client.ValidateAPIKey()
 }
+
+// GetClient returns the underlying client for direct access to Steam API methods
+func (s *APIService) GetClient() *Client {
+	return s.client
+}
