@@ -11,23 +11,26 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/jimsantora/steam-librarian/internal/services"
 	"github.com/jimsantora/steam-librarian/internal/storage"
 	"github.com/jimsantora/steam-librarian/internal/steam"
 )
 
 // Server implements the MCP (Model Context Protocol) server for Steam Librarian
 type Server struct {
-	repo     *storage.Repository
-	steamAPI *steam.APIService
-	logger   *logrus.Logger
+	repo        *storage.Repository
+	steamAPI    *steam.APIService
+	syncService *services.LibrarySyncService
+	logger      *logrus.Logger
 }
 
 // NewServer creates a new MCP server instance
-func NewServer(repo *storage.Repository, steamAPI *steam.APIService, logger *logrus.Logger) *Server {
+func NewServer(repo *storage.Repository, steamAPI *steam.APIService, syncService *services.LibrarySyncService, logger *logrus.Logger) *Server {
 	return &Server{
-		repo:     repo,
-		steamAPI: steamAPI,
-		logger:   logger,
+		repo:        repo,
+		steamAPI:    steamAPI,
+		syncService: syncService,
+		logger:      logger,
 	}
 }
 
@@ -154,6 +157,62 @@ func (s *Server) handleRequest(requestLine string) ([]byte, error) {
 		} else {
 			response.Result = result
 		}
+	case "steam_librarian/get_sync_progress":
+		result, err := s.handleGetSyncProgress(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/get_sync_history":
+		result, err := s.handleGetSyncHistory(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/cancel_sync":
+		result, err := s.handleCancelSync(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/get_active_syncs":
+		result, err := s.handleGetActiveSyncs(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/get_conflicts":
+		result, err := s.handleGetConflicts(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/resolve_conflict":
+		result, err := s.handleResolveConflict(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/auto_resolve_conflicts":
+		result, err := s.handleAutoResolveConflicts(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
+	case "steam_librarian/get_conflict_statistics":
+		result, err := s.handleGetConflictStatistics(req.Params)
+		if err != nil {
+			response.Error = &MCPError{Code: -32603, Message: "Internal error", Data: err.Error()}
+		} else {
+			response.Result = result
+		}
 	case "steam_librarian/get_stats":
 		result, err := s.handleGetStats(req.Params)
 		if err != nil {
@@ -196,10 +255,30 @@ func (s *Server) handleInitialize(params map[string]interface{}) map[string]inte
 			"tools": map[string]interface{}{
 				"listChanged": false,
 			},
+			"resources": map[string]interface{}{
+				"subscribe": false,
+			},
 		},
 		"serverInfo": map[string]interface{}{
-			"name":    "steam-librarian",
-			"version": "0.1.0",
+			"name":        "steam-librarian",
+			"version":     "0.1.0",
+			"description": "Steam library management with sync capabilities",
+		},
+		"supportedMethods": []string{
+			"steam_librarian/list_libraries",
+			"steam_librarian/list_games", 
+			"steam_librarian/get_library",
+			"steam_librarian/get_game",
+			"steam_librarian/sync_library",
+			"steam_librarian/get_sync_progress",
+			"steam_librarian/get_sync_history",
+			"steam_librarian/cancel_sync",
+			"steam_librarian/get_active_syncs",
+			"steam_librarian/get_conflicts",
+			"steam_librarian/resolve_conflict",
+			"steam_librarian/auto_resolve_conflicts",
+			"steam_librarian/get_conflict_statistics",
+			"steam_librarian/get_stats",
 		},
 	}
 }
@@ -304,18 +383,39 @@ func (s *Server) handleSyncLibrary(params map[string]interface{}) (map[string]in
 		return nil, fmt.Errorf("steam_user_id is required")
 	}
 
-	s.logger.WithField("steam_user_id", steamUserID).Info("Starting library sync via MCP")
+	// Get sync type (default to incremental)
+	syncTypeStr, _ := params["sync_type"].(string)
+	if syncTypeStr == "" {
+		syncTypeStr = "incremental"
+	}
 
-	// TODO: Implement actual sync logic
-	// This would:
-	// 1. Call Steam API to get user's games
-	// 2. Update local database with new/changed games
-	// 3. Return sync status
+	var syncType services.SyncType
+	switch syncTypeStr {
+	case "full":
+		syncType = services.SyncTypeFull
+	case "incremental":
+		syncType = services.SyncTypeIncremental
+	default:
+		return nil, fmt.Errorf("invalid sync_type. Use 'full' or 'incremental'")
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"steam_user_id": steamUserID,
+		"sync_type":     syncTypeStr,
+	}).Info("Starting library sync via MCP")
+
+	// Start async sync
+	progress, err := s.syncService.SyncLibraryAsync(steamUserID, syncType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start sync: %w", err)
+	}
 
 	return map[string]interface{}{
 		"status":        "started",
 		"steam_user_id": steamUserID,
-		"message":       "Library sync started (implementation pending)",
+		"sync_type":     syncTypeStr,
+		"progress":      progress,
+		"message":       "Library sync started successfully",
 	}, nil
 }
 
@@ -349,5 +449,157 @@ func (s *Server) handleGetStats(params map[string]interface{}) (map[string]inter
 		"total_playtime":  totalPlaytime,
 		"never_played":    neverPlayed,
 		"stats_generated": "2024-01-01T00:00:00Z", // TODO: Use actual timestamp
+	}, nil
+}
+
+// handleGetSyncProgress returns the current sync progress for a user
+func (s *Server) handleGetSyncProgress(params map[string]interface{}) (map[string]interface{}, error) {
+	steamUserID, ok := params["steam_user_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("steam_user_id is required")
+	}
+
+	progress, exists := s.syncService.GetSyncProgress(steamUserID)
+	if !exists {
+		return map[string]interface{}{
+			"steam_user_id": steamUserID,
+			"active":        false,
+			"message":       "No active sync found for this user",
+		}, nil
+	}
+
+	return map[string]interface{}{
+		"steam_user_id": steamUserID,
+		"active":        true,
+		"progress":      progress,
+	}, nil
+}
+
+// handleGetSyncHistory returns the sync history for a user
+func (s *Server) handleGetSyncHistory(params map[string]interface{}) (map[string]interface{}, error) {
+	steamUserID, ok := params["steam_user_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("steam_user_id is required")
+	}
+
+	history := s.syncService.GetSyncHistory(steamUserID)
+
+	return map[string]interface{}{
+		"steam_user_id": steamUserID,
+		"history":       history,
+		"count":         len(history),
+	}, nil
+}
+
+// handleCancelSync cancels an active sync operation
+func (s *Server) handleCancelSync(params map[string]interface{}) (map[string]interface{}, error) {
+	steamUserID, ok := params["steam_user_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("steam_user_id is required")
+	}
+
+	err := s.syncService.CancelSync(steamUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel sync: %w", err)
+	}
+
+	return map[string]interface{}{
+		"steam_user_id": steamUserID,
+		"status":        "cancelled",
+		"message":       "Sync cancelled successfully",
+	}, nil
+}
+
+// handleGetActiveSyncs returns all currently active sync operations
+func (s *Server) handleGetActiveSyncs(params map[string]interface{}) (map[string]interface{}, error) {
+	activeSyncs := s.syncService.GetActiveSyncs()
+
+	return map[string]interface{}{
+		"active_syncs": activeSyncs,
+		"count":        len(activeSyncs),
+	}, nil
+}
+
+// handleGetConflicts returns conflicts based on optional filters
+func (s *Server) handleGetConflicts(params map[string]interface{}) (map[string]interface{}, error) {
+	conflictResolver := s.syncService.GetConflictResolver()
+	
+	statusParam, _ := params["status"].(string)
+	typeParam, _ := params["type"].(string)
+	
+	var status services.ConflictStatus
+	var conflictType services.ConflictType
+	
+	if statusParam != "" {
+		status = services.ConflictStatus(statusParam)
+	}
+	if typeParam != "" {
+		conflictType = services.ConflictType(typeParam)
+	}
+	
+	conflicts := conflictResolver.GetConflicts(status, conflictType)
+	
+	return map[string]interface{}{
+		"conflicts": conflicts,
+		"count":     len(conflicts),
+		"filters": map[string]interface{}{
+			"status": statusParam,
+			"type":   typeParam,
+		},
+	}, nil
+}
+
+// handleResolveConflict resolves a specific conflict
+func (s *Server) handleResolveConflict(params map[string]interface{}) (map[string]interface{}, error) {
+	conflictID, ok := params["conflict_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("conflict_id is required")
+	}
+	
+	strategyStr, ok := params["strategy"].(string)
+	if !ok {
+		return nil, fmt.Errorf("strategy is required")
+	}
+	
+	resolvedBy, _ := params["resolved_by"].(string)
+	if resolvedBy == "" {
+		resolvedBy = "mcp-user"
+	}
+	
+	strategy := services.ConflictResolutionStrategy(strategyStr)
+	conflictResolver := s.syncService.GetConflictResolver()
+	
+	if err := conflictResolver.ResolveConflict(conflictID, strategy, resolvedBy); err != nil {
+		return nil, fmt.Errorf("failed to resolve conflict: %w", err)
+	}
+	
+	return map[string]interface{}{
+		"message":     "Conflict resolved successfully",
+		"conflict_id": conflictID,
+		"strategy":    strategy,
+		"resolved_by": resolvedBy,
+	}, nil
+}
+
+// handleAutoResolveConflicts triggers automatic conflict resolution
+func (s *Server) handleAutoResolveConflicts(params map[string]interface{}) (map[string]interface{}, error) {
+	conflictResolver := s.syncService.GetConflictResolver()
+	
+	if err := conflictResolver.AutoResolveConflicts(); err != nil {
+		return nil, fmt.Errorf("auto-resolution failed: %w", err)
+	}
+	
+	return map[string]interface{}{
+		"message": "Auto-resolution completed successfully",
+	}, nil
+}
+
+// handleGetConflictStatistics returns conflict resolution statistics
+func (s *Server) handleGetConflictStatistics(params map[string]interface{}) (map[string]interface{}, error) {
+	conflictResolver := s.syncService.GetConflictResolver()
+	stats := conflictResolver.GetStatistics()
+	
+	return map[string]interface{}{
+		"statistics": stats,
 	}, nil
 }
