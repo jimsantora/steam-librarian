@@ -133,7 +133,87 @@ func (db *Database) AutoMigrate() error {
 		return fmt.Errorf("failed to run auto migration: %w", err)
 	}
 	
+	// Add indexes for enhanced game metadata (Phase 1.3)
+	if err := db.createGameIndexes(); err != nil {
+		log.Printf("Warning: Failed to create game indexes: %v", err)
+		// Don't fail the migration if index creation fails
+	}
+	
 	log.Println("Database migrations completed successfully")
+	return nil
+}
+
+// createGameIndexes creates database indexes for improved query performance
+func (db *Database) createGameIndexes() error {
+	log.Println("Creating database indexes for enhanced game metadata...")
+	
+	// Index for Metacritic scores (for sorting by rating)
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_metacritic_score ON games(metacritic_score)").Error; err != nil {
+		return fmt.Errorf("failed to create metacritic_score index: %w", err)
+	}
+	
+	// Index for price information (for sorting by price)
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_current_price ON games(current_price)").Error; err != nil {
+		return fmt.Errorf("failed to create current_price index: %w", err)
+	}
+	
+	// Index for discount percentage (for finding games on sale)
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_discount_percent ON games(discount_percent)").Error; err != nil {
+		return fmt.Errorf("failed to create discount_percent index: %w", err)
+	}
+	
+	// Index for free games
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_is_free ON games(is_free)").Error; err != nil {
+		return fmt.Errorf("failed to create is_free index: %w", err)
+	}
+	
+	// Index for early access games
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_early_access ON games(early_access)").Error; err != nil {
+		return fmt.Errorf("failed to create early_access index: %w", err)
+	}
+	
+	// Index for achievements count
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_achievements ON games(achievements)").Error; err != nil {
+		return fmt.Errorf("failed to create achievements index: %w", err)
+	}
+	
+	// Composite index for Steam features (commonly queried together)
+	if err := db.DB.Exec("CREATE INDEX IF NOT EXISTS idx_games_steam_features ON games(has_workshop, has_achievements, has_multiplayer)").Error; err != nil {
+		return fmt.Errorf("failed to create steam_features index: %w", err)
+	}
+	
+	log.Println("Database indexes created successfully")
+	return nil
+}
+
+// MigrateGameMetadata performs a one-time migration to populate enhanced metadata
+// This can be used to update existing games with new metadata fields
+func (db *Database) MigrateGameMetadata() error {
+	log.Println("Migrating existing game metadata...")
+	
+	// Set default values for new fields where they are null/empty
+	updates := map[string]interface{}{
+		"metacritic_score": 0,
+		"achievements":     0,
+		"is_free":          false,
+		"coming_soon":      false,
+		"early_access":     false,
+		"current_price":    0.0,
+		"original_price":   0.0,
+		"discount_percent": 0,
+		"price_currency":   "USD",
+	}
+	
+	// Update games that don't have the new metadata fields set
+	result := db.DB.Model(&models.Game{}).
+		Where("metacritic_score IS NULL OR metacritic_score = 0").
+		Updates(updates)
+	
+	if result.Error != nil {
+		return fmt.Errorf("failed to migrate game metadata: %w", result.Error)
+	}
+	
+	log.Printf("Migrated metadata for %d games", result.RowsAffected)
 	return nil
 }
 

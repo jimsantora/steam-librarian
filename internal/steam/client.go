@@ -202,6 +202,71 @@ type GameDetails struct {
 		IDs   []int  `json:"ids"`
 		Notes string `json:"notes"`
 	} `json:"content_descriptors"`
+	
+	// Enhanced metadata (Phase 1.3)
+	Screenshots []struct {
+		ID       int    `json:"id"`
+		PathThumbnail string `json:"path_thumbnail"`
+		PathFull string `json:"path_full"`
+	} `json:"screenshots"`
+	
+	Movies []struct {
+		ID int `json:"id"`
+		Name string `json:"name"`
+		Thumbnail string `json:"thumbnail"`
+		WebM struct {
+			Low string `json:"480"`
+			Max string `json:"max"`
+		} `json:"webm"`
+		MP4 struct {
+			Low string `json:"480"`
+			Max string `json:"max"`
+		} `json:"mp4"`
+		Highlight bool `json:"highlight"`
+	} `json:"movies"`
+	
+	PriceOverview struct {
+		Currency string `json:"currency"`
+		Initial  int    `json:"initial"`
+		Final    int    `json:"final"`
+		DiscountPercent int `json:"discount_percent"`
+		InitialFormatted string `json:"initial_formatted"`
+		FinalFormatted   string `json:"final_formatted"`
+	} `json:"price_overview"`
+	
+	Metacritic struct {
+		Score int    `json:"score"`
+		URL   string `json:"url"`
+	} `json:"metacritic"`
+	
+	Achievements struct {
+		Total       int `json:"total"`
+		Highlighted []struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"highlighted"`
+	} `json:"achievements"`
+	
+	PCRequirements struct {
+		Minimum     string `json:"minimum"`
+		Recommended string `json:"recommended"`
+	} `json:"pc_requirements"`
+	
+	MacRequirements struct {
+		Minimum     string `json:"minimum"`
+		Recommended string `json:"recommended"`
+	} `json:"mac_requirements"`
+	
+	LinuxRequirements struct {
+		Minimum     string `json:"minimum"`
+		Recommended string `json:"recommended"`
+	} `json:"linux_requirements"`
+	
+	// User-defined tags (not always available in store API)
+	Tags []struct {
+		ID   int    `json:"tagid"`
+		Name string `json:"name"`
+	} `json:"tags"`
 }
 
 // GetAppDetailsResponse represents the response from Steam store API
