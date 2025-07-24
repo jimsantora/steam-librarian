@@ -1,49 +1,88 @@
 #!/usr/bin/env python3
-"""Steam Library MCP Server - Provides access to Steam game library data"""
+"""Steam Library MCP Server - Provides access to Steam game library data using SQLite"""
 
 import os
 from typing import Annotated, Optional, List, Dict, Any
 from datetime import datetime
-import pandas as pd
+from sqlalchemy import func, and_, or_, desc
 from fastmcp import FastMCP
+
+from database import (
+    get_db, Game, UserGame, Genre, Developer, Publisher, Category, 
+    GameReview, UserProfile
+)
 
 # Create the server instance
 mcp = FastMCP("steam-librarian")
 
-# Load the Steam library data at startup
-# Use absolute path to ensure CSV is found regardless of working directory
-script_dir = os.path.dirname(os.path.abspath(__file__))
-csv_path = os.path.join(script_dir, "steam_library.csv")
-try:
-    df = pd.read_csv(csv_path)
-    # Convert playtime from minutes to hours
-    df['playtime_forever_hours'] = df['playtime_forever'] / 60
-    df['playtime_2weeks_hours'] = df['playtime_2weeks'] / 60
-    # Don't print to stdout as it interferes with STDIO protocol
-    pass
-except Exception as e:
-    # Don't print to stdout as it interferes with STDIO protocol
-    df = pd.DataFrame()  # Empty dataframe as fallback
+# Get Steam ID from environment
+STEAM_ID = os.environ.get('STEAM_ID', '')
+
+def get_user_steam_id() -> str:
+    """Get the Steam ID for the current user"""
+    # Try to get from environment first
+    if STEAM_ID:
+        return STEAM_ID
+    
+    # Otherwise get from database (first user)
+    with get_db() as session:
+        user = session.query(UserProfile).first()
+        if user:
+            return user.steam_id
+    
+    return ''
 
 @mcp.tool
 def search_games(
     query: Annotated[str, "Search term to match against game name, genre, developer, or publisher"]
 ) -> List[Dict[str, Any]]:
     """Search for games by name, genre, developer, or publisher"""
-    if df.empty:
+    steam_id = get_user_steam_id()
+    if not steam_id:
         return []
     
-    query_lower = query.lower()
-    # Search across multiple fields
-    mask = (
-        df['name'].str.lower().str.contains(query_lower, na=False) |
-        df['genres'].str.lower().str.contains(query_lower, na=False) |
-        df['developers'].str.lower().str.contains(query_lower, na=False) |
-        df['publishers'].str.lower().str.contains(query_lower, na=False)
-    )
-    
-    results = df[mask][['appid', 'name', 'genres', 'review_summary', 'playtime_forever_hours']].to_dict('records')
-    return results
+    with get_db() as session:
+        # Build the query with joins
+        query_lower = f"%{query.lower()}%"
+        
+        results = session.query(
+            Game.app_id,
+            Game.name,
+            func.group_concat(Genre.genre_name.distinct()).label('genres'),
+            GameReview.review_summary,
+            UserGame.playtime_forever
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).outerjoin(
+            GameReview, Game.app_id == GameReview.app_id
+        ).outerjoin(
+            Game.genres
+        ).outerjoin(
+            Game.developers
+        ).outerjoin(
+            Game.publishers
+        ).filter(
+            and_(
+                UserGame.steam_id == steam_id,
+                or_(
+                    Game.name.ilike(query_lower),
+                    Genre.genre_name.ilike(query_lower),
+                    Developer.developer_name.ilike(query_lower),
+                    Publisher.publisher_name.ilike(query_lower)
+                )
+            )
+        ).group_by(Game.app_id).order_by(desc(UserGame.playtime_forever)).all()
+        
+        return [
+            {
+                'appid': result.app_id,
+                'name': result.name,
+                'genres': result.genres or '',
+                'review_summary': result.review_summary or 'Unknown',
+                'playtime_forever_hours': round(result.playtime_forever / 60, 1) if result.playtime_forever else 0
+            }
+            for result in results
+        ]
 
 @mcp.tool
 def filter_games(
@@ -53,55 +92,125 @@ def filter_games(
     maturity_rating: Annotated[Optional[str], "Maturity rating to filter by (e.g., 'Everyone', 'Teen (13+)')"] = None
 ) -> List[Dict[str, Any]]:
     """Filter games by playtime, review summary, or maturity rating"""
-    if df.empty:
+    steam_id = get_user_steam_id()
+    if not steam_id:
         return []
     
-    filtered = df.copy()
-    
-    if playtime_min is not None:
-        filtered = filtered[filtered['playtime_forever_hours'] >= playtime_min]
-    
-    if playtime_max is not None:
-        filtered = filtered[filtered['playtime_forever_hours'] <= playtime_max]
-    
-    if review_summary:
-        filtered = filtered[filtered['review_summary'].str.lower() == review_summary.lower()]
-    
-    if maturity_rating:
-        filtered = filtered[filtered['maturity_rating'].str.lower() == maturity_rating.lower()]
-    
-    results = filtered[['appid', 'name', 'genres', 'review_summary', 'playtime_forever_hours']].to_dict('records')
-    return results
+    with get_db() as session:
+        query = session.query(
+            Game.app_id,
+            Game.name,
+            func.group_concat(Genre.genre_name.distinct()).label('genres'),
+            GameReview.review_summary,
+            UserGame.playtime_forever
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).outerjoin(
+            GameReview, Game.app_id == GameReview.app_id
+        ).outerjoin(
+            Game.genres
+        ).filter(
+            UserGame.steam_id == steam_id
+        )
+        
+        # Apply filters
+        if playtime_min is not None:
+            query = query.filter(UserGame.playtime_forever >= playtime_min * 60)
+        
+        if playtime_max is not None:
+            query = query.filter(UserGame.playtime_forever <= playtime_max * 60)
+        
+        if review_summary:
+            query = query.filter(GameReview.review_summary.ilike(f"%{review_summary}%"))
+        
+        if maturity_rating:
+            query = query.filter(Game.maturity_rating.ilike(f"%{maturity_rating}%"))
+        
+        results = query.group_by(Game.app_id).order_by(desc(UserGame.playtime_forever)).all()
+        
+        return [
+            {
+                'appid': result.app_id,
+                'name': result.name,
+                'genres': result.genres or '',
+                'review_summary': result.review_summary or 'Unknown',
+                'playtime_forever_hours': round(result.playtime_forever / 60, 1) if result.playtime_forever else 0
+            }
+            for result in results
+        ]
 
 @mcp.tool
 def get_game_details(
     game_identifier: Annotated[str, "Game name or appid to get details for"]
 ) -> Optional[Dict[str, Any]]:
     """Get comprehensive details about a specific game"""
-    if df.empty:
+    steam_id = get_user_steam_id()
+    if not steam_id:
         return None
     
-    # Try to match by appid first (if it's a number)
-    try:
-        appid = int(game_identifier)
-        game = df[df['appid'] == appid]
-    except ValueError:
-        # Otherwise search by name (case-insensitive)
-        game = df[df['name'].str.lower() == game_identifier.lower()]
-    
-    if game.empty:
-        # Try partial match on name
-        game = df[df['name'].str.lower().str.contains(game_identifier.lower(), na=False)]
-    
-    if game.empty:
-        return None
-    
-    # Return the first match
-    result = game.iloc[0].to_dict()
-    # Add the hours fields
-    result['playtime_forever_hours'] = result['playtime_forever'] / 60
-    result['playtime_2weeks_hours'] = result['playtime_2weeks'] / 60
-    return result
+    with get_db() as session:
+        # Try to match by appid first (if it's a number)
+        game = None
+        try:
+            appid = int(game_identifier)
+            game = session.query(Game).filter_by(app_id=appid).first()
+        except ValueError:
+            # Otherwise search by name (case-insensitive exact match first)
+            game = session.query(Game).filter(Game.name.ilike(game_identifier)).first()
+            
+            # If no exact match, try partial match
+            if not game:
+                game = session.query(Game).filter(Game.name.ilike(f"%{game_identifier}%")).first()
+        
+        if not game:
+            return None
+        
+        # Get user game data
+        user_game = session.query(UserGame).filter_by(
+            steam_id=steam_id, 
+            app_id=game.app_id
+        ).first()
+        
+        # Get review data
+        review = session.query(GameReview).filter_by(app_id=game.app_id).first()
+        
+        # Build result
+        result = {
+            'appid': game.app_id,
+            'name': game.name,
+            'maturity_rating': game.maturity_rating,
+            'required_age': game.required_age,
+            'content_descriptors': game.content_descriptors,
+            'release_date': game.release_date,
+            'genres': ', '.join([g.genre_name for g in game.genres]),
+            'categories': ', '.join([c.category_name for c in game.categories]),
+            'developers': ', '.join([d.developer_name for d in game.developers]),
+            'publishers': ', '.join([p.publisher_name for p in game.publishers]),
+            'playtime_forever': user_game.playtime_forever if user_game else 0,
+            'playtime_2weeks': user_game.playtime_2weeks if user_game else 0,
+            'playtime_forever_hours': round(user_game.playtime_forever / 60, 1) if user_game and user_game.playtime_forever else 0,
+            'playtime_2weeks_hours': round(user_game.playtime_2weeks / 60, 1) if user_game and user_game.playtime_2weeks else 0,
+        }
+        
+        # Add review data if available
+        if review:
+            result.update({
+                'review_summary': review.review_summary,
+                'review_score': review.review_score,
+                'total_reviews': review.total_reviews,
+                'positive_reviews': review.positive_reviews,
+                'negative_reviews': review.negative_reviews,
+            })
+        else:
+            result.update({
+                'review_summary': 'Unknown',
+                'review_score': 0,
+                'total_reviews': 0,
+                'positive_reviews': 0,
+                'negative_reviews': 0,
+            })
+        
+        return result
 
 @mcp.tool
 def get_game_reviews(
@@ -112,6 +221,10 @@ def get_game_reviews(
     if not game:
         return None
     
+    positive_percentage = 0
+    if game['total_reviews'] > 0:
+        positive_percentage = round((game['positive_reviews'] / game['total_reviews']) * 100, 1)
+    
     return {
         'name': game['name'],
         'appid': game['appid'],
@@ -120,13 +233,14 @@ def get_game_reviews(
         'total_reviews': game['total_reviews'],
         'positive_reviews': game['positive_reviews'],
         'negative_reviews': game['negative_reviews'],
-        'positive_percentage': (game['positive_reviews'] / game['total_reviews'] * 100) if game['total_reviews'] > 0 else 0
+        'positive_percentage': positive_percentage
     }
 
 @mcp.tool
 def get_library_stats() -> Dict[str, Any]:
     """Get overview statistics about the entire game library"""
-    if df.empty:
+    steam_id = get_user_steam_id()
+    if not steam_id:
         return {
             'total_games': 0,
             'total_hours_played': 0,
@@ -136,114 +250,224 @@ def get_library_stats() -> Dict[str, Any]:
             'review_distribution': {}
         }
     
-    # Basic stats
-    total_games = len(df)
-    total_hours = df['playtime_forever_hours'].sum()
-    avg_hours = total_hours / total_games if total_games > 0 else 0
-    
-    # Genre distribution (split comma-separated genres)
-    genre_counts = {}
-    for genres in df['genres'].dropna():
-        for genre in genres.split(', '):
-            genre = genre.strip()
-            genre_counts[genre] = genre_counts.get(genre, 0) + 1
-    top_genres = dict(sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:10])
-    
-    # Developer distribution
-    dev_counts = df['developers'].value_counts().head(10).to_dict()
-    
-    # Review distribution
-    review_dist = df['review_summary'].value_counts().to_dict()
-    
-    return {
-        'total_games': total_games,
-        'total_hours_played': round(total_hours, 2),
-        'average_hours_per_game': round(avg_hours, 2),
-        'top_genres': top_genres,
-        'top_developers': dev_counts,
-        'review_distribution': review_dist
-    }
+    with get_db() as session:
+        # Basic stats
+        total_games = session.query(UserGame).filter_by(steam_id=steam_id).count()
+        
+        total_minutes = session.query(func.sum(UserGame.playtime_forever)).filter_by(steam_id=steam_id).scalar() or 0
+        total_hours = round(total_minutes / 60, 2)
+        avg_hours = round(total_hours / total_games, 2) if total_games > 0 else 0
+        
+        # Top genres
+        genre_stats = session.query(
+            Genre.genre_name,
+            func.count(Genre.genre_name).label('count')
+        ).join(
+            Game.genres
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).filter(
+            UserGame.steam_id == steam_id
+        ).group_by(Genre.genre_name).order_by(desc('count')).limit(10).all()
+        
+        top_genres = {genre.genre_name: genre.count for genre in genre_stats}
+        
+        # Top developers
+        dev_stats = session.query(
+            Developer.developer_name,
+            func.count(Developer.developer_name).label('count')
+        ).join(
+            Game.developers
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).filter(
+            UserGame.steam_id == steam_id
+        ).group_by(Developer.developer_name).order_by(desc('count')).limit(10).all()
+        
+        top_developers = {dev.developer_name: dev.count for dev in dev_stats}
+        
+        # Review distribution
+        review_stats = session.query(
+            GameReview.review_summary,
+            func.count(GameReview.review_summary).label('count')
+        ).join(
+            UserGame, GameReview.app_id == UserGame.app_id
+        ).filter(
+            UserGame.steam_id == steam_id
+        ).group_by(GameReview.review_summary).all()
+        
+        review_distribution = {review.review_summary: review.count for review in review_stats if review.review_summary}
+        
+        return {
+            'total_games': total_games,
+            'total_hours_played': total_hours,
+            'average_hours_per_game': avg_hours,
+            'top_genres': top_genres,
+            'top_developers': top_developers,
+            'review_distribution': review_distribution
+        }
 
 @mcp.tool
 def get_recently_played() -> List[Dict[str, Any]]:
     """Get games played in the last 2 weeks"""
-    if df.empty:
+    steam_id = get_user_steam_id()
+    if not steam_id:
         return []
     
-    recent = df[df['playtime_2weeks'] > 0].copy()
-    recent = recent.sort_values('playtime_2weeks', ascending=False)
-    
-    results = recent[['appid', 'name', 'playtime_2weeks_hours', 'playtime_forever_hours']].to_dict('records')
-    return results
+    with get_db() as session:
+        results = session.query(
+            Game.app_id,
+            Game.name,
+            UserGame.playtime_2weeks,
+            UserGame.playtime_forever
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).filter(
+            and_(
+                UserGame.steam_id == steam_id,
+                UserGame.playtime_2weeks > 0
+            )
+        ).order_by(desc(UserGame.playtime_2weeks)).all()
+        
+        return [
+            {
+                'appid': result.app_id,
+                'name': result.name,
+                'playtime_2weeks_hours': round(result.playtime_2weeks / 60, 1),
+                'playtime_forever_hours': round(result.playtime_forever / 60, 1)
+            }
+            for result in results
+        ]
 
 @mcp.tool
 def get_recommendations() -> List[Dict[str, Any]]:
     """Get personalized game recommendations based on playtime patterns"""
-    if df.empty:
+    steam_id = get_user_steam_id()
+    if not steam_id:
         return []
     
-    recommendations = []
-    
-    # Get user's top genres by playtime
-    played_games = df[df['playtime_forever'] > 0].copy()
-    if played_games.empty:
-        # If no games played, recommend highest rated games
-        top_rated = df[df['review_summary'].isin(['Overwhelmingly Positive', 'Very Positive'])].head(5)
-        for _, game in top_rated.iterrows():
-            recommendations.append({
-                'appid': game['appid'],
-                'name': game['name'],
-                'reason': f"Highly rated game ({game['review_summary']}) you haven't played yet"
-            })
-        return recommendations
-    
-    # Find favorite genres
-    genre_playtime = {}
-    for _, game in played_games.iterrows():
-        if pd.notna(game['genres']):
-            playtime = game['playtime_forever_hours']
-            for genre in game['genres'].split(', '):
-                genre = genre.strip()
-                genre_playtime[genre] = genre_playtime.get(genre, 0) + playtime
-    
-    top_genres = sorted(genre_playtime.items(), key=lambda x: x[1], reverse=True)[:3]
-    
-    # Find unplayed games in favorite genres
-    unplayed = df[df['playtime_forever'] == 0].copy()
-    
-    for genre, hours in top_genres:
-        genre_games = unplayed[unplayed['genres'].str.contains(genre, na=False)]
-        # Get highest rated games in this genre
-        genre_games = genre_games[genre_games['review_summary'].isin(['Overwhelmingly Positive', 'Very Positive'])]
+    with get_db() as session:
+        recommendations = []
         
-        for _, game in genre_games.head(2).iterrows():
-            recommendations.append({
-                'appid': game['appid'],
-                'name': game['name'],
-                'reason': f"Similar genre ({genre}) to games you've played {round(hours, 1)} hours"
-            })
-    
-    # Find games from favorite developers
-    top_devs = played_games.groupby('developers')['playtime_forever_hours'].sum().sort_values(ascending=False).head(3)
-    
-    for dev, hours in top_devs.items():
-        dev_games = unplayed[unplayed['developers'] == dev]
-        for _, game in dev_games.head(1).iterrows():
-            recommendations.append({
-                'appid': game['appid'],
-                'name': game['name'],
-                'reason': f"From {dev} who made games you've played {round(hours, 1)} hours"
-            })
-    
-    # Remove duplicates
-    seen = set()
-    unique_recs = []
-    for rec in recommendations:
-        if rec['appid'] not in seen:
-            seen.add(rec['appid'])
-            unique_recs.append(rec)
-    
-    return unique_recs[:10]  # Limit to 10 recommendations
+        # Get user's top genres by playtime
+        played_games = session.query(UserGame).filter(
+            and_(
+                UserGame.steam_id == steam_id,
+                UserGame.playtime_forever > 0
+            )
+        ).count()
+        
+        if played_games == 0:
+            # If no games played, recommend highest rated games
+            top_rated = session.query(Game).join(
+                GameReview, Game.app_id == GameReview.app_id
+            ).join(
+                UserGame, Game.app_id == UserGame.app_id
+            ).filter(
+                and_(
+                    UserGame.steam_id == steam_id,
+                    UserGame.playtime_forever == 0,
+                    GameReview.review_summary.in_(['Overwhelmingly Positive', 'Very Positive'])
+                )
+            ).limit(5).all()
+            
+            for game in top_rated:
+                review = session.query(GameReview).filter_by(app_id=game.app_id).first()
+                recommendations.append({
+                    'appid': game.app_id,
+                    'name': game.name,
+                    'reason': f"Highly rated game ({review.review_summary if review else 'Unknown'}) you haven't played yet"
+                })
+            return recommendations
+        
+        # Find favorite genres by total playtime
+        genre_playtime = session.query(
+            Genre.genre_name,
+            func.sum(UserGame.playtime_forever).label('total_playtime')
+        ).join(
+            Game.genres
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).filter(
+            and_(
+                UserGame.steam_id == steam_id,
+                UserGame.playtime_forever > 0
+            )
+        ).group_by(Genre.genre_name).order_by(desc('total_playtime')).limit(3).all()
+        
+        # Find unplayed games in favorite genres
+        for genre_data in genre_playtime:
+            genre_games = session.query(Game).join(
+                Game.genres
+            ).join(
+                UserGame, Game.app_id == UserGame.app_id
+            ).outerjoin(
+                GameReview, Game.app_id == GameReview.app_id
+            ).filter(
+                and_(
+                    UserGame.steam_id == steam_id,
+                    UserGame.playtime_forever == 0,
+                    Genre.genre_name == genre_data.genre_name,
+                    or_(
+                        GameReview.review_summary.in_(['Overwhelmingly Positive', 'Very Positive']),
+                        GameReview.review_summary.is_(None)
+                    )
+                )
+            ).limit(2).all()
+            
+            hours = round(genre_data.total_playtime / 60, 1)
+            for game in genre_games:
+                recommendations.append({
+                    'appid': game.app_id,
+                    'name': game.name,
+                    'reason': f"Similar genre ({genre_data.genre_name}) to games you've played {hours} hours"
+                })
+        
+        # Find games from favorite developers
+        dev_playtime = session.query(
+            Developer.developer_name,
+            func.sum(UserGame.playtime_forever).label('total_playtime')
+        ).join(
+            Game.developers
+        ).join(
+            UserGame, Game.app_id == UserGame.app_id
+        ).filter(
+            and_(
+                UserGame.steam_id == steam_id,
+                UserGame.playtime_forever > 0
+            )
+        ).group_by(Developer.developer_name).order_by(desc('total_playtime')).limit(3).all()
+        
+        for dev_data in dev_playtime:
+            dev_games = session.query(Game).join(
+                Game.developers
+            ).join(
+                UserGame, Game.app_id == UserGame.app_id
+            ).filter(
+                and_(
+                    UserGame.steam_id == steam_id,
+                    UserGame.playtime_forever == 0,
+                    Developer.developer_name == dev_data.developer_name
+                )
+            ).limit(1).all()
+            
+            hours = round(dev_data.total_playtime / 60, 1)
+            for game in dev_games:
+                recommendations.append({
+                    'appid': game.app_id,
+                    'name': game.name,
+                    'reason': f"From {dev_data.developer_name} who made games you've played {hours} hours"
+                })
+        
+        # Remove duplicates
+        seen = set()
+        unique_recs = []
+        for rec in recommendations:
+            if rec['appid'] not in seen:
+                seen.add(rec['appid'])
+                unique_recs.append(rec)
+        
+        return unique_recs[:10]  # Limit to 10 recommendations
 
 if __name__ == "__main__":
     mcp.run()
