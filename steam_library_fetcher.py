@@ -22,12 +22,17 @@ Usage:
 import os
 import sys
 import time
-import csv
 from datetime import datetime
 import logging
 from typing import Dict, List, Optional, Any
 from dotenv import load_dotenv
 import requests
+
+from database import (
+    get_db, create_database, get_or_create,
+    Game, UserGame, Genre, Developer, Publisher, Category, 
+    GameReview, UserProfile
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -234,35 +239,133 @@ class SteamLibraryFetcher:
         
         return game_info
         
-    def save_to_csv(self, game_data: Dict = None, filename: str = "steam_library.csv", write_header: bool = False):
-        """Save game data to CSV file incrementally"""
-        # Define CSV columns
-        fieldnames = [
-            'appid', 'name', 'maturity_rating', 'required_age', 'content_descriptors',
-            'review_summary', 'review_score', 'total_reviews', 'positive_reviews', 
-            'negative_reviews', 'genres', 'categories', 'developers', 'publishers',
-            'release_date', 'playtime_forever', 'playtime_2weeks'
-        ]
+    def save_to_database(self, game_data: Dict, steam_id: str):
+        """Save game data to SQLite database using SQLAlchemy"""
+        with get_db() as session:
+            app_id = game_data['appid']
+            
+            # Create or update game
+            game = session.query(Game).filter_by(app_id=app_id).first()
+            if not game:
+                game = Game(
+                    app_id=app_id,
+                    name=game_data['name'],
+                    maturity_rating=game_data['maturity_rating'],
+                    required_age=game_data['required_age'],
+                    content_descriptors=game_data['content_descriptors'],
+                    release_date=game_data['release_date'],
+                    last_updated=int(datetime.now().timestamp())
+                )
+                session.add(game)
+                session.flush()
+            else:
+                # Update existing game data
+                game.name = game_data['name']
+                game.maturity_rating = game_data['maturity_rating']
+                game.required_age = game_data['required_age']
+                game.content_descriptors = game_data['content_descriptors']
+                game.release_date = game_data['release_date']
+                game.last_updated = int(datetime.now().timestamp())
+            
+            # Handle genres
+            if game_data['genres']:
+                # Clear existing genres for this game
+                game.genres.clear()
+                for genre_name in game_data['genres'].split(', '):
+                    if genre_name.strip():
+                        genre = get_or_create(session, Genre, genre_name=genre_name.strip())
+                        game.genres.append(genre)
+            
+            # Handle developers
+            if game_data['developers']:
+                game.developers.clear()
+                for dev_name in game_data['developers'].split(', '):
+                    if dev_name.strip():
+                        developer = get_or_create(session, Developer, developer_name=dev_name.strip())
+                        game.developers.append(developer)
+            
+            # Handle publishers
+            if game_data['publishers']:
+                game.publishers.clear()
+                for pub_name in game_data['publishers'].split(', '):
+                    if pub_name.strip():
+                        publisher = get_or_create(session, Publisher, publisher_name=pub_name.strip())
+                        game.publishers.append(publisher)
+            
+            # Handle categories
+            if game_data['categories']:
+                game.categories.clear()
+                for cat_name in game_data['categories'].split(', '):
+                    if cat_name.strip():
+                        category = get_or_create(session, Category, category_name=cat_name.strip())
+                        game.categories.append(category)
+            
+            # Handle reviews
+            if game_data['review_summary'] != 'Unknown' or game_data['total_reviews'] > 0:
+                review = session.query(GameReview).filter_by(app_id=app_id).first()
+                if not review:
+                    review = GameReview(
+                        app_id=app_id,
+                        review_summary=game_data['review_summary'],
+                        review_score=game_data['review_score'],
+                        total_reviews=game_data['total_reviews'],
+                        positive_reviews=game_data['positive_reviews'],
+                        negative_reviews=game_data['negative_reviews'],
+                        last_updated=int(datetime.now().timestamp())
+                    )
+                    session.add(review)
+                else:
+                    # Update existing review
+                    review.review_summary = game_data['review_summary']
+                    review.review_score = game_data['review_score']
+                    review.total_reviews = game_data['total_reviews']
+                    review.positive_reviews = game_data['positive_reviews']
+                    review.negative_reviews = game_data['negative_reviews']
+                    review.last_updated = int(datetime.now().timestamp())
+            
+            # Handle user game data
+            user_game = session.query(UserGame).filter_by(
+                steam_id=steam_id, 
+                app_id=app_id
+            ).first()
+            
+            if not user_game:
+                user_game = UserGame(
+                    steam_id=steam_id,
+                    app_id=app_id,
+                    playtime_forever=game_data['playtime_forever'],
+                    playtime_2weeks=game_data['playtime_2weeks']
+                )
+                session.add(user_game)
+            else:
+                # Update playtime data
+                user_game.playtime_forever = max(user_game.playtime_forever, game_data['playtime_forever'])
+                user_game.playtime_2weeks = game_data['playtime_2weeks']
+            
+            session.commit()
         
-        mode = 'w' if write_header else 'a'
-        with open(filename, mode, newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if write_header:
-                writer.writeheader()
-                logger.info(f"Created CSV file: {filename}")
-            if game_data:
-                writer.writerow(game_data)
+    def fetch_library_data(self, steam_id: str):
+        """Main method to fetch all library data and save to database"""
+        # Create database tables if they don't exist
+        create_database()
         
-    def fetch_library_data(self, steam_id: str, filename: str = "steam_library.csv"):
-        """Main method to fetch all library data"""
+        # Create user profile if it doesn't exist
+        with get_db() as session:
+            user = session.query(UserProfile).filter_by(steam_id=steam_id).first()
+            if not user:
+                user = UserProfile(
+                    steam_id=steam_id,
+                    last_updated=int(datetime.now().timestamp())
+                )
+                session.add(user)
+                session.commit()
+                logger.info(f"Created user profile for Steam ID: {steam_id}")
+        
         # Get owned games
         owned_games = self.get_owned_games(steam_id)
         if not owned_games:
             logger.error("No games found in library")
             return
-            
-        # Initialize CSV file with header
-        self.save_to_csv(filename=filename, write_header=True)
         
         total_games = len(owned_games)
         failed_count = 0
@@ -275,8 +378,8 @@ class SteamLibraryFetcher:
         for index, game in enumerate(owned_games, 1):
             try:
                 game_data = self.process_game(game, index, total_games)
-                # Write to CSV immediately
-                self.save_to_csv(game_data, filename)
+                # Save to database immediately
+                self.save_to_database(game_data, steam_id)
                 processed_count += 1
                 
                 # Show progress every 10 games
@@ -287,7 +390,7 @@ class SteamLibraryFetcher:
             except Exception as e:
                 failed_count += 1
                 logger.error(f"Error processing game {game.get('name', 'Unknown')}: {e}")
-                # Still write basic info even if detailed processing fails
+                # Still save basic info even if detailed processing fails
                 fallback_data = {
                     'appid': game.get('appid'),
                     'name': game.get('name', 'Unknown'),
@@ -307,13 +410,16 @@ class SteamLibraryFetcher:
                     'positive_reviews': 0,
                     'negative_reviews': 0
                 }
-                self.save_to_csv(fallback_data, filename)
-                processed_count += 1
+                try:
+                    self.save_to_database(fallback_data, steam_id)
+                    processed_count += 1
+                except Exception as db_error:
+                    logger.error(f"Failed to save fallback data for {game.get('name', 'Unknown')}: {db_error}")
                 
         if failed_count > 0:
             logger.warning(f"Note: {failed_count} games had limited data due to API restrictions")
         
-        logger.info(f"Completed! Processed {processed_count} games successfully. Data saved to {filename}")
+        logger.info(f"Completed! Processed {processed_count} games successfully. Data saved to database")
         
 def main():
     # Load environment variables from .env file
