@@ -63,6 +63,16 @@ game_categories = Table(
     Column('category_id', Integer, ForeignKey('categories.category_id'), primary_key=True)
 )
 
+# Association table for friends relationships
+friends_association = Table(
+    'friends',
+    Base.metadata,
+    Column('user_steam_id', String, ForeignKey('user_profile.steam_id'), primary_key=True),
+    Column('friend_steam_id', String, ForeignKey('user_profile.steam_id'), primary_key=True),
+    Column('relationship', String),  # 'friend' or 'all'
+    Column('friend_since', Integer)  # Unix timestamp
+)
+
 # Models
 class UserProfile(Base):
     __tablename__ = 'user_profile'
@@ -83,6 +93,20 @@ class UserProfile(Base):
     
     # Relationships
     games = relationship("UserGame", back_populates="user", cascade="all, delete-orphan")
+    friends = relationship(
+        "UserProfile",
+        secondary=friends_association,
+        primaryjoin=steam_id == friends_association.c.user_steam_id,
+        secondaryjoin=steam_id == friends_association.c.friend_steam_id,
+        back_populates="friend_of"
+    )
+    friend_of = relationship(
+        "UserProfile", 
+        secondary=friends_association,
+        primaryjoin=steam_id == friends_association.c.friend_steam_id,
+        secondaryjoin=steam_id == friends_association.c.user_steam_id,
+        back_populates="friends"
+    )
 
 class Game(Base):
     __tablename__ = 'games'
