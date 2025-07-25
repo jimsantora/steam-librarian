@@ -8,8 +8,10 @@ from sqlalchemy import func, and_, or_, desc
 from fastmcp import FastMCP
 
 from database import (
-    get_db, Game, UserGame, Genre, Developer, Publisher, Category, 
-    GameReview, UserProfile, friends_association
+    get_db, get_db_transaction, Game, UserGame, Genre, Developer, Publisher, Category, 
+    GameReview, UserProfile, friends_association,
+    handle_user_not_found, handle_game_not_found, handle_multiple_users,
+    create_error_response, create_success_response, resolve_user_for_tool, resolve_user_identifier
 )
 
 # Create the server instance
@@ -18,24 +20,6 @@ mcp = FastMCP("steam-librarian")
 # Get Steam ID from environment (fallback for backwards compatibility)
 STEAM_ID = os.environ.get('STEAM_ID', '')
 
-@mcp.prompt
-def select_user_prompt() -> str:
-    """Prompt to select which user to use for the query"""
-    with get_db() as session:
-        users = session.query(UserProfile).all()
-        if not users:
-            return "No users found in database. Please run the fetcher first with: python steam_library_fetcher.py"
-        
-        user_list = "\n".join([
-            f"- {user.persona_name or 'Unknown'} (Steam ID: {user.steam_id})" 
-            for user in users
-        ])
-    
-    return f"""Please select a user for this query:
-
-{user_list}
-
-Enter the Steam ID of the user you want to use:"""
 
 @mcp.tool
 def get_all_users() -> List[Dict[str, Any]]:
@@ -53,24 +37,6 @@ def get_all_users() -> List[Dict[str, Any]]:
             for user in users
         ]
 
-def resolve_user_identifier(user_identifier: Optional[str]) -> Optional[str]:
-    """Resolve user identifier (Steam ID or persona name) to Steam ID"""
-    if not user_identifier:
-        return None
-    
-    # If it looks like a Steam ID (all digits), use it directly
-    if user_identifier.isdigit():
-        return user_identifier
-    
-    # Otherwise, search by persona name (case-insensitive)
-    with get_db() as session:
-        user = session.query(UserProfile).filter(
-            func.lower(UserProfile.persona_name) == func.lower(user_identifier)
-        ).first()
-        if user:
-            return user.steam_id
-    
-    return None
 
 def get_user_steam_id() -> str:
     """Get the Steam ID for the current user (backwards compatibility)"""
@@ -91,32 +57,12 @@ def get_user_info(
     user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None
 ) -> Optional[Dict[str, Any]]:
     """Get comprehensive user profile information including Steam level, account age, and location"""
-    # Resolve user identifier (could be Steam ID or persona name)
-    if user_steam_id:
-        resolved_steam_id = resolve_user_identifier(user_steam_id)
-        if not resolved_steam_id:
-            return {'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}
-        user_steam_id = resolved_steam_id
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return user_result
     
-    if not user_steam_id:
-        # Auto-select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) == 1:
-                user_steam_id = users[0].steam_id
-            elif len(users) > 1:
-                # Return list of available users for selection
-                return {
-                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
-                    'available_users': [{
-                        'steam_id': user.steam_id,
-                        'persona_name': user.persona_name or 'Unknown'
-                    } for user in users]
-                }
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
-    
-    steam_id = user_steam_id
+    steam_id = user_result['steam_id']
     if not steam_id:
         return {
             'error': 'No Steam ID configured',
@@ -205,34 +151,12 @@ def search_games(
     user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None
 ) -> List[Dict[str, Any]]:
     """Search for games by name, genre, developer, or publisher"""
-    # Resolve user identifier (could be Steam ID or persona name)
-    if user_steam_id:
-        resolved_steam_id = resolve_user_identifier(user_steam_id)
-        if not resolved_steam_id:
-            return [{'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}]
-        user_steam_id = resolved_steam_id
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return [user_result]  # Return as list since this function returns List
     
-    if not user_steam_id:
-        # Auto-select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) == 1:
-                user_steam_id = users[0].steam_id
-            elif len(users) > 1:
-                # Return list of available users for selection
-                return [{
-                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
-                    'available_users': [{
-                        'steam_id': user.steam_id,
-                        'persona_name': user.persona_name or 'Unknown'
-                    } for user in users]
-                }]
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
-    
-    steam_id = user_steam_id
-    if not steam_id:
-        return []
+    steam_id = user_result['steam_id']
     
     with get_db() as session:
         # Build the query with joins
@@ -286,20 +210,12 @@ def filter_games(
     user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
 ) -> List[Dict[str, Any]]:
     """Filter games by playtime, review summary, or maturity rating"""
-    if not user_steam_id:
-        # Use prompt to select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return [{'prompt_needed': True, 'message': select_user_prompt()}]
-            elif len(users) == 1:
-                user_steam_id = users[0].steam_id
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return [user_result]  # Return as list since this function returns List
     
-    steam_id = user_steam_id
-    if not steam_id:
-        return []
+    steam_id = user_result['steam_id']
     
     with get_db() as session:
         query = session.query(
@@ -350,20 +266,12 @@ def get_game_details(
     user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
 ) -> Optional[Dict[str, Any]]:
     """Get comprehensive details about a specific game"""
-    if not user_steam_id:
-        # Use prompt to select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return {'prompt_needed': True, 'message': select_user_prompt()}
-            elif len(users) == 1:
-                user_steam_id = users[0].steam_id
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return user_result
     
-    steam_id = user_steam_id
-    if not steam_id:
-        return None
+    steam_id = user_result['steam_id']
     
     with get_db() as session:
         # Try to match by appid first (if it's a number)
@@ -459,32 +367,12 @@ def get_library_stats(
     user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None
 ) -> Dict[str, Any]:
     """Get overview statistics about the entire game library"""
-    # Resolve user identifier (could be Steam ID or persona name)
-    if user_steam_id:
-        resolved_steam_id = resolve_user_identifier(user_steam_id)
-        if not resolved_steam_id:
-            return {'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}
-        user_steam_id = resolved_steam_id
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return user_result
     
-    if not user_steam_id:
-        # Auto-select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) == 1:
-                user_steam_id = users[0].steam_id
-            elif len(users) > 1:
-                # Return list of available users for selection
-                return {
-                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
-                    'available_users': [{
-                        'steam_id': user.steam_id,
-                        'persona_name': user.persona_name or 'Unknown'
-                    } for user in users]
-                }
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
-    
-    steam_id = user_steam_id
+    steam_id = user_result['steam_id']
     if not steam_id:
         return {
             'total_games': 0,
@@ -557,20 +445,12 @@ def get_recently_played(
     user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
 ) -> List[Dict[str, Any]]:
     """Get games played in the last 2 weeks"""
-    if not user_steam_id:
-        # Use prompt to select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return [{'prompt_needed': True, 'message': select_user_prompt()}]
-            elif len(users) == 1:
-                user_steam_id = users[0].steam_id
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return [user_result]  # Return as list since this function returns List
     
-    steam_id = user_steam_id
-    if not steam_id:
-        return []
+    steam_id = user_result['steam_id']
     
     with get_db() as session:
         results = session.query(
@@ -602,20 +482,12 @@ def get_recommendations(
     user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
 ) -> List[Dict[str, Any]]:
     """Get personalized game recommendations based on playtime patterns"""
-    if not user_steam_id:
-        # Use prompt to select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return [{'prompt_needed': True, 'message': select_user_prompt()}]
-            elif len(users) == 1:
-                user_steam_id = users[0].steam_id
-            else:
-                user_steam_id = get_user_steam_id()  # Fallback to env var
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return [user_result]  # Return as list since this function returns List
     
-    steam_id = user_steam_id
-    if not steam_id:
-        return []
+    steam_id = user_result['steam_id']
     
     with get_db() as session:
         recommendations = []
@@ -749,30 +621,12 @@ def get_friends_data(
 ) -> Optional[Dict[str, Any]]:
     """Unified tool for all friends-related queries"""
     
-    # Resolve user identifier (could be Steam ID or persona name)
-    if user_steam_id:
-        resolved_steam_id = resolve_user_identifier(user_steam_id)
-        if not resolved_steam_id:
-            return {'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}
-        user_steam_id = resolved_steam_id
+    # Use utility function to resolve user
+    user_result = resolve_user_for_tool(user_steam_id, get_user_steam_id)
+    if 'error' in user_result:
+        return user_result
     
-    if not user_steam_id:
-        # Auto-select user if none provided
-        with get_db() as session:
-            users = session.query(UserProfile).all()
-            if len(users) == 1:
-                user_steam_id = users[0].steam_id
-            elif len(users) > 1:
-                # Return list of available users for selection
-                return {
-                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
-                    'available_users': [{
-                        'steam_id': user.steam_id,
-                        'persona_name': user.persona_name or 'Unknown'
-                    } for user in users]
-                }
-            else:
-                return {'error': 'No users found in database'}
+    user_steam_id = user_result['steam_id']
     
     # Also resolve friend identifier if provided
     if friend_steam_id:
