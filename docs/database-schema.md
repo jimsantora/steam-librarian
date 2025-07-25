@@ -17,14 +17,16 @@ Steam Library Database Schema
 │ persona_name    │ │   │ name            │  │  │ review_summary  │
 │ profile_url     │ │   │ maturity_rating │  │  │ review_score    │
 │ avatar_url      │ │   │ required_age    │  │  │ total_reviews   │
-│ account_created │ │   │ content_desc... │  │  │ positive_reviews│
-│ steam_level     │ │   │ release_date    │  │  │ negative_reviews│
-│ last_updated    │ │   │ metacritic_score│  │  │ last_updated    │
-└─────────────────┘ │   │ steam_deck_ver. │  │  └─────────────────┘
-                    │   │ controller_sup. │  │
-                    │   │ vr_support      │  │
-                    │   │ last_updated    │  │
-                    │   └─────────────────┘  │
+│ avatarmedium    │ │   │ content_desc... │  │  │ positive_reviews│
+│ avatarfull      │ │   │ release_date    │  │  │ negative_reviews│
+│ time_created    │ │   │ metacritic_score│  │  │ last_updated    │
+│ account_created │ │   │ steam_deck_ver. │  │  └─────────────────┘
+│ loccountrycode  │ │   │ controller_sup. │  │
+│ locstatecode    │ │   │ vr_support      │  │
+│ xp              │ │   │ last_updated    │  │
+│ steam_level     │ │   └─────────────────┘  │
+│ last_updated    │ │                        │
+└─────────────────┘ │                        │
                     │                        │
                     │   ┌─────────────────┐  │
                     └──│   user_games    │  │
@@ -84,9 +86,15 @@ Stores Steam user account information.
 | `steam_id` | STRING (PK) | 64-bit Steam ID |
 | `persona_name` | STRING | Steam display name |
 | `profile_url` | STRING | Steam profile URL |
-| `avatar_url` | STRING | Profile avatar image URL |
-| `account_created` | INTEGER | Unix timestamp of account creation |
-| `steam_level` | INTEGER | Steam level |
+| `avatar_url` | STRING | Small profile avatar image URL |
+| `avatarmedium` | STRING | Medium profile avatar image URL |
+| `avatarfull` | STRING | Full/large profile avatar image URL |
+| `time_created` | INTEGER | Unix timestamp of account creation |
+| `account_created` | INTEGER | Deprecated - use time_created |
+| `loccountrycode` | STRING | Country code (e.g., "US") if public |
+| `locstatecode` | STRING | State/region code (e.g., "CA") if public |
+| `xp` | INTEGER | Raw Steam XP value |
+| `steam_level` | INTEGER | Steam level calculated from XP |
 | `last_updated` | INTEGER | Unix timestamp of last profile update |
 
 #### `games`

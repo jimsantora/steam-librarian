@@ -70,9 +70,15 @@ class UserProfile(Base):
     steam_id = Column(String, primary_key=True)
     persona_name = Column(String)
     profile_url = Column(String)
-    avatar_url = Column(String)
-    account_created = Column(Integer)
-    steam_level = Column(Integer)
+    avatar_url = Column(String)  # Small avatar
+    avatarmedium = Column(String)  # Medium avatar URL
+    avatarfull = Column(String)  # Full avatar URL
+    time_created = Column(Integer)  # Account creation timestamp
+    account_created = Column(Integer)  # Deprecated - use time_created
+    loccountrycode = Column(String)  # Country code (e.g., "US")
+    locstatecode = Column(String)  # State/region code (e.g., "CA")
+    xp = Column(Integer)  # Raw XP value
+    steam_level = Column(Integer)  # Calculated from XP
     last_updated = Column(Integer, default=lambda: int(datetime.now().timestamp()))
     
     # Relationships

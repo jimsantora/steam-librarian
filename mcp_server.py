@@ -33,6 +33,92 @@ def get_user_steam_id() -> str:
     return ''
 
 @mcp.tool
+def get_user_info() -> Optional[Dict[str, Any]]:
+    """Get comprehensive user profile information including Steam level, account age, and location"""
+    steam_id = get_user_steam_id()
+    if not steam_id:
+        return {
+            'error': 'No Steam ID configured',
+            'steam_id': '',
+            'persona_name': 'Unknown',
+            'profile_url': '',
+            'steam_level': 0,
+            'xp': 0,
+            'account_age_years': 0,
+            'account_created_date': '',
+            'location': 'Unknown',
+            'avatar_urls': {
+                'small': '',
+                'medium': '',
+                'large': ''
+            }
+        }
+    
+    with get_db() as session:
+        user = session.query(UserProfile).filter_by(steam_id=steam_id).first()
+        
+        if not user:
+            return {
+                'error': 'User profile not found. Run steam_library_fetcher.py first.',
+                'steam_id': steam_id,
+                'persona_name': 'Unknown',
+                'profile_url': '',
+                'steam_level': 0,
+                'xp': 0,
+                'account_age_years': 0,
+                'account_created_date': '',
+                'location': 'Unknown',
+                'avatar_urls': {
+                    'small': '',
+                    'medium': '',
+                    'large': ''
+                }
+            }
+        
+        # Calculate account age
+        account_age_years = 0
+        account_created_date = 'Unknown'
+        if user.time_created and user.time_created > 0:
+            account_created = datetime.fromtimestamp(user.time_created)
+            account_created_date = account_created.strftime('%Y-%m-%d')
+            account_age_years = round((datetime.now() - account_created).days / 365.25, 1)
+        
+        # Format location
+        location = 'Unknown'
+        if user.loccountrycode:
+            location = user.loccountrycode
+            if user.locstatecode:
+                location += f", {user.locstatecode}"
+        
+        # Get total games count
+        total_games = session.query(UserGame).filter_by(steam_id=steam_id).count()
+        
+        # Get total playtime
+        total_playtime_minutes = session.query(func.sum(UserGame.playtime_forever)).filter_by(steam_id=steam_id).scalar() or 0
+        total_playtime_hours = round(total_playtime_minutes / 60, 1)
+        
+        return {
+            'steam_id': user.steam_id,
+            'persona_name': user.persona_name or 'Unknown',
+            'profile_url': user.profile_url or '',
+            'steam_level': user.steam_level or 0,
+            'xp': user.xp or 0,
+            'account_age_years': account_age_years,
+            'account_created_date': account_created_date,
+            'location': location,
+            'avatar_urls': {
+                'small': user.avatar_url or '',
+                'medium': user.avatarmedium or '',
+                'large': user.avatarfull or ''
+            },
+            'library_stats': {
+                'total_games': total_games,
+                'total_playtime_hours': total_playtime_hours
+            },
+            'last_updated': datetime.fromtimestamp(user.last_updated).strftime('%Y-%m-%d %H:%M:%S') if user.last_updated else 'Never'
+        }
+
+@mcp.tool
 def search_games(
     query: Annotated[str, "Search term to match against game name, genre, developer, or publisher"]
 ) -> List[Dict[str, Any]]:

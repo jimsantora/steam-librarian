@@ -156,6 +156,101 @@ class SteamLibraryFetcher:
             
         return None
         
+    def get_player_summaries(self, steam_id: str) -> Optional[Dict]:
+        """Get player profile information from Steam API"""
+        logger.info(f"Fetching player profile for Steam ID: {steam_id}")
+        
+        try:
+            url = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/"
+            params = {
+                'key': self.api_key,
+                'steamids': steam_id,
+                'format': 'json'
+            }
+            
+            response = self.session.get(url, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'response' in data and 'players' in data['response']:
+                    players = data['response']['players']
+                    if players and len(players) > 0:
+                        return players[0]
+                    else:
+                        logger.error("No player data found in response")
+                        return None
+                else:
+                    logger.error("Invalid response structure")
+                    return None
+            else:
+                logger.error(f"Steam API returned {response.status_code}")
+                logger.error(f"Response: {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error fetching player summaries: {e}")
+            return None
+    
+    def get_player_badges(self, steam_id: str) -> Optional[Dict]:
+        """Get player badges and XP information from Steam API"""
+        logger.info(f"Fetching player badges/XP for Steam ID: {steam_id}")
+        
+        try:
+            url = "http://api.steampowered.com/IPlayerService/GetBadges/v1/"
+            params = {
+                'key': self.api_key,
+                'steamid': steam_id,  # Note: singular 'steamid', not 'steamids'
+                'format': 'json'
+            }
+            
+            response = self.session.get(url, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'response' in data:
+                    return data['response']
+                else:
+                    logger.error("Invalid response structure for badges")
+                    return None
+            else:
+                logger.error(f"Steam API returned {response.status_code} for badges")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error fetching player badges: {e}")
+            return None
+    
+    def calculate_steam_level(self, xp: int) -> int:
+        """Calculate Steam level from XP using Steam's formula"""
+        # Steam's level calculation formula
+        # Levels 1-10: 100 XP per level
+        # Levels 11-20: 200 XP per level  
+        # Levels 21-30: 300 XP per level
+        # And so on...
+        
+        if xp < 100:
+            return 0
+            
+        level = 0
+        xp_remaining = xp
+        
+        # Calculate level based on XP brackets
+        bracket_size = 100
+        bracket_levels = 10
+        
+        while xp_remaining > 0:
+            xp_for_bracket = bracket_size * bracket_levels
+            
+            if xp_remaining >= xp_for_bracket:
+                level += bracket_levels
+                xp_remaining -= xp_for_bracket
+                bracket_size += 100
+            else:
+                level += xp_remaining // bracket_size
+                break
+                
+        return level
+        
     def process_game(self, game: Dict, index: int, total: int) -> Dict:
         """Process a single game and gather all required information"""
         appid = game.get('appid')
@@ -349,17 +444,80 @@ class SteamLibraryFetcher:
         # Create database tables if they don't exist
         create_database()
         
-        # Create user profile if it doesn't exist
+        # Fetch user profile data from Steam API
+        player_data = self.get_player_summaries(steam_id)
+        
+        # Create or update user profile
         with get_db() as session:
             user = session.query(UserProfile).filter_by(steam_id=steam_id).first()
-            if not user:
-                user = UserProfile(
-                    steam_id=steam_id,
-                    last_updated=int(datetime.now().timestamp())
-                )
-                session.add(user)
+            
+            if player_data:
+                # Extract profile data from API response
+                persona_name = player_data.get('personaname', '')
+                profile_url = player_data.get('profileurl', '')
+                avatar = player_data.get('avatar', '')
+                avatarmedium = player_data.get('avatarmedium', '')
+                avatarfull = player_data.get('avatarfull', '')
+                time_created = player_data.get('timecreated', 0)
+                loccountrycode = player_data.get('loccountrycode', '')
+                locstatecode = player_data.get('locstatecode', '')
+                
+                # Get XP and level data from badges endpoint
+                badges_data = self.get_player_badges(steam_id)
+                if badges_data:
+                    xp = badges_data.get('player_xp', 0)
+                    steam_level = badges_data.get('player_level', 0)
+                    logger.info(f"Player XP: {xp}, Level: {steam_level}")
+                else:
+                    # Fallback: try to calculate from XP if we have it
+                    xp = 0
+                    steam_level = 0
+                
+                if not user:
+                    user = UserProfile(
+                        steam_id=steam_id,
+                        persona_name=persona_name,
+                        profile_url=profile_url,
+                        avatar_url=avatar,
+                        avatarmedium=avatarmedium,
+                        avatarfull=avatarfull,
+                        time_created=time_created,
+                        account_created=time_created,  # For backwards compatibility
+                        loccountrycode=loccountrycode,
+                        locstatecode=locstatecode,
+                        xp=xp,
+                        steam_level=steam_level,
+                        last_updated=int(datetime.now().timestamp())
+                    )
+                    session.add(user)
+                    logger.info(f"Created user profile for: {persona_name} (Steam ID: {steam_id})")
+                else:
+                    # Update existing user profile
+                    user.persona_name = persona_name
+                    user.profile_url = profile_url
+                    user.avatar_url = avatar
+                    user.avatarmedium = avatarmedium
+                    user.avatarfull = avatarfull
+                    user.time_created = time_created
+                    user.account_created = time_created  # For backwards compatibility
+                    user.loccountrycode = loccountrycode
+                    user.locstatecode = locstatecode
+                    user.xp = xp
+                    user.steam_level = steam_level
+                    user.last_updated = int(datetime.now().timestamp())
+                    logger.info(f"Updated user profile for: {persona_name} (Steam ID: {steam_id})")
+                
                 session.commit()
-                logger.info(f"Created user profile for Steam ID: {steam_id}")
+            else:
+                # Create minimal profile if API call failed
+                if not user:
+                    user = UserProfile(
+                        steam_id=steam_id,
+                        last_updated=int(datetime.now().timestamp())
+                    )
+                    session.add(user)
+                    session.commit()
+                    logger.info(f"Created minimal user profile for Steam ID: {steam_id}")
         
         # Get owned games
         owned_games = self.get_owned_games(steam_id)
