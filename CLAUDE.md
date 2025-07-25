@@ -14,40 +14,63 @@ This is a fully functional Steam Library MCP (Model Context Protocol) server tha
 pip install -r requirements.txt
 
 # Run the MCP server (uses STDIO transport for Claude Desktop)
-python mcp_server.py
+python run_mcp_server.py
+# Or: python -m src.mcp.server
 
 # Fetch fresh Steam library data (requires .env with STEAM_ID and STEAM_API_KEY)
-python steam_library_fetcher.py
+python run_fetcher.py
+# Or: python scripts/fetch_steam_data.py
 ```
 
 ### Configuration
 ```bash
 # Create configuration from example
-cp claude_desktop_config.example.json claude_desktop_config.json
+cp config/claude_desktop_config.example.json claude_desktop_config.json
 # Edit paths in claude_desktop_config.json to match your system
 # Copy to Claude Desktop location (macOS): ~/Library/Application Support/Claude/claude_desktop_config.json
 ```
 
 ## Architecture & Structure
 
+### Project Structure
+```
+src/
+├── core/           # Core functionality (database, config)
+├── models/         # SQLAlchemy models
+├── api/            # Steam API client and data fetching
+├── mcp/            # MCP server and tools
+│   ├── tools/      # Individual MCP tool implementations
+│   └── prompts/    # MCP prompts
+└── utils/          # Shared utilities
+
+scripts/            # CLI entry points
+config/             # Configuration examples
+```
+
 ### Core Components
 
-1. **mcp_server.py**: Fully functional MCP server with 8 Steam library tools
-   - Uses SQLite database for data storage via SQLAlchemy
-   - Converts playtime from minutes to hours for readability
-   - Uses STDIO transport (not HTTP) for Claude Desktop integration
+1. **src/mcp/server.py**: Main MCP server setup
+   - Registers all tools and prompts
+   - Uses STDIO transport for Claude Desktop integration
    - **CRITICAL**: Never print to stdout during operation as it breaks STDIO protocol
 
-2. **steam_library_fetcher.py**: Steam API data fetcher
-   - Fetches comprehensive game data from Steam API
-   - Fetches user profile data including Steam level and XP
-   - Requires `.env` file with `STEAM_ID` and `STEAM_API_KEY`
-   - Stores data in SQLite database
+2. **src/api/**: Steam API integration
+   - `steam_client.py`: Low-level Steam API client
+   - `fetcher.py`: High-level data orchestration
+   - Fetches game data, user profiles, friends, and reviews
 
-3. **database.py**: SQLAlchemy models and database management
-   - Defines relational data model for games, users, genres, reviews, etc.
+3. **src/models/**: SQLAlchemy data models
+   - `game.py`: Game, Genre, Developer, Publisher, Category models
+   - `user.py`: UserProfile, UserGame models
+   - `review.py`: GameReview model
    - Handles many-to-many relationships properly
-   - Uses SQLite for efficient querying and data integrity
+
+4. **src/mcp/tools/**: MCP tool implementations
+   - `search.py`: search_games, filter_games
+   - `details.py`: get_game_details, get_game_reviews
+   - `stats.py`: get_library_stats
+   - `recommendations.py`: get_recommendations
+   - `user.py`: get_user_info, get_recently_played, get_friends_data
 
 ### Implemented MCP Tools
 
@@ -68,13 +91,14 @@ cp claude_desktop_config.example.json claude_desktop_config.json
 
 ### Configuration Files
 
-- **claude_desktop_config.example.json**: Template for users to customize
+- **config/claude_desktop_config.example.json**: Template for users to customize
 - **claude_desktop_config.json**: Personal config (gitignored)
 - **.env**: Steam API credentials (gitignored)
+- **src/core/config.py**: Centralized configuration management
 
 ## Important Development Notes
 
-- **STDIO Protocol**: Never use `print()` statements in mcp_server.py as they interfere with Claude Desktop communication
+- **STDIO Protocol**: Never use `print()` statements in src/mcp/server.py or any MCP tools as they interfere with Claude Desktop communication
 - **Database**: Uses SQLite database (`steam_library.db`) with SQLAlchemy ORM
 - **Error Handling**: Tools return empty lists/None for missing data rather than raising exceptions
 - **Performance**: Database queries are optimized with proper indexes and relationships

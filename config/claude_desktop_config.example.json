@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "steam-librarian": {
+      "command": "python",
+      "args": ["/path/to/your/steam-librarian/run_mcp_server.py"],
+      "env": {}
+    }
+  }
+}
