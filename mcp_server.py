@@ -53,6 +53,25 @@ def get_all_users() -> List[Dict[str, Any]]:
             for user in users
         ]
 
+def resolve_user_identifier(user_identifier: Optional[str]) -> Optional[str]:
+    """Resolve user identifier (Steam ID or persona name) to Steam ID"""
+    if not user_identifier:
+        return None
+    
+    # If it looks like a Steam ID (all digits), use it directly
+    if user_identifier.isdigit():
+        return user_identifier
+    
+    # Otherwise, search by persona name (case-insensitive)
+    with get_db() as session:
+        user = session.query(UserProfile).filter(
+            func.lower(UserProfile.persona_name) == func.lower(user_identifier)
+        ).first()
+        if user:
+            return user.steam_id
+    
+    return None
+
 def get_user_steam_id() -> str:
     """Get the Steam ID for the current user (backwards compatibility)"""
     # Try to get from environment first
@@ -69,17 +88,31 @@ def get_user_steam_id() -> str:
 
 @mcp.tool
 def get_user_info(
-    user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
+    user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None
 ) -> Optional[Dict[str, Any]]:
     """Get comprehensive user profile information including Steam level, account age, and location"""
+    # Resolve user identifier (could be Steam ID or persona name)
+    if user_steam_id:
+        resolved_steam_id = resolve_user_identifier(user_steam_id)
+        if not resolved_steam_id:
+            return {'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}
+        user_steam_id = resolved_steam_id
+    
     if not user_steam_id:
-        # Use prompt to select user if none provided
+        # Auto-select user if none provided
         with get_db() as session:
             users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return {'prompt_needed': True, 'message': select_user_prompt()}
-            elif len(users) == 1:
+            if len(users) == 1:
                 user_steam_id = users[0].steam_id
+            elif len(users) > 1:
+                # Return list of available users for selection
+                return {
+                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
+                    'available_users': [{
+                        'steam_id': user.steam_id,
+                        'persona_name': user.persona_name or 'Unknown'
+                    } for user in users]
+                }
             else:
                 user_steam_id = get_user_steam_id()  # Fallback to env var
     
@@ -169,17 +202,31 @@ def get_user_info(
 @mcp.tool
 def search_games(
     query: Annotated[str, "Search term to match against game name, genre, developer, or publisher"],
-    user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
+    user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None
 ) -> List[Dict[str, Any]]:
     """Search for games by name, genre, developer, or publisher"""
+    # Resolve user identifier (could be Steam ID or persona name)
+    if user_steam_id:
+        resolved_steam_id = resolve_user_identifier(user_steam_id)
+        if not resolved_steam_id:
+            return [{'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}]
+        user_steam_id = resolved_steam_id
+    
     if not user_steam_id:
-        # Use prompt to select user if none provided
+        # Auto-select user if none provided
         with get_db() as session:
             users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return [{'prompt_needed': True, 'message': select_user_prompt()}]
-            elif len(users) == 1:
+            if len(users) == 1:
                 user_steam_id = users[0].steam_id
+            elif len(users) > 1:
+                # Return list of available users for selection
+                return [{
+                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
+                    'available_users': [{
+                        'steam_id': user.steam_id,
+                        'persona_name': user.persona_name or 'Unknown'
+                    } for user in users]
+                }]
             else:
                 user_steam_id = get_user_steam_id()  # Fallback to env var
     
@@ -409,17 +456,31 @@ def get_game_reviews(
 
 @mcp.tool
 def get_library_stats(
-    user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None
+    user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None
 ) -> Dict[str, Any]:
     """Get overview statistics about the entire game library"""
+    # Resolve user identifier (could be Steam ID or persona name)
+    if user_steam_id:
+        resolved_steam_id = resolve_user_identifier(user_steam_id)
+        if not resolved_steam_id:
+            return {'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}
+        user_steam_id = resolved_steam_id
+    
     if not user_steam_id:
-        # Use prompt to select user if none provided
+        # Auto-select user if none provided
         with get_db() as session:
             users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return {'prompt_needed': True, 'message': select_user_prompt()}
-            elif len(users) == 1:
+            if len(users) == 1:
                 user_steam_id = users[0].steam_id
+            elif len(users) > 1:
+                # Return list of available users for selection
+                return {
+                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
+                    'available_users': [{
+                        'steam_id': user.steam_id,
+                        'persona_name': user.persona_name or 'Unknown'
+                    } for user in users]
+                }
             else:
                 user_steam_id = get_user_steam_id()  # Fallback to env var
     
@@ -682,22 +743,43 @@ def get_recommendations(
 @mcp.tool
 def get_friends_data(
     data_type: Annotated[str, "Type of data: 'list', 'common_games', 'who_owns_game', 'library_comparison'"],
-    user_steam_id: Annotated[Optional[str], "Steam ID of user (leave empty to be prompted)"] = None,
-    friend_steam_id: Annotated[Optional[str], "Friend's Steam ID for specific queries"] = None,
+    user_steam_id: Annotated[Optional[str], "Steam ID or persona name of user (leave empty for auto-selection)"] = None,
+    friend_steam_id: Annotated[Optional[str], "Friend's Steam ID or persona name for specific queries"] = None,
     game_identifier: Annotated[Optional[str], "Game name or appid for game-specific queries"] = None
 ) -> Optional[Dict[str, Any]]:
     """Unified tool for all friends-related queries"""
     
+    # Resolve user identifier (could be Steam ID or persona name)
+    if user_steam_id:
+        resolved_steam_id = resolve_user_identifier(user_steam_id)
+        if not resolved_steam_id:
+            return {'error': f'User not found: {user_steam_id}. Available users can be seen with get_all_users()'}
+        user_steam_id = resolved_steam_id
+    
     if not user_steam_id:
-        # Use prompt to select user if none provided
+        # Auto-select user if none provided
         with get_db() as session:
             users = session.query(UserProfile).all()
-            if len(users) > 1:
-                return {'prompt_needed': True, 'message': select_user_prompt()}
-            elif len(users) == 1:
+            if len(users) == 1:
                 user_steam_id = users[0].steam_id
+            elif len(users) > 1:
+                # Return list of available users for selection
+                return {
+                    'message': 'Multiple users found. Please specify which user by Steam ID or persona name:',
+                    'available_users': [{
+                        'steam_id': user.steam_id,
+                        'persona_name': user.persona_name or 'Unknown'
+                    } for user in users]
+                }
             else:
                 return {'error': 'No users found in database'}
+    
+    # Also resolve friend identifier if provided
+    if friend_steam_id:
+        resolved_friend_id = resolve_user_identifier(friend_steam_id) 
+        if not resolved_friend_id:
+            return {'error': f'Friend not found: {friend_steam_id}'}
+        friend_steam_id = resolved_friend_id
     
     if not user_steam_id:
         return {'error': 'No user Steam ID provided'}
@@ -742,34 +824,72 @@ def get_friends_data(
             if not friend_steam_id:
                 return {'error': 'friend_steam_id required for common_games query'}
             
-            common_games = session.query(
-                Game.app_id, Game.name,
-                UserGame.playtime_forever.label('user_playtime'),
-                func.max(UserGame.playtime_forever).label('friend_playtime')
-            ).join(
-                UserGame, Game.app_id == UserGame.app_id
-            ).filter(
-                UserGame.steam_id.in_([user_steam_id, friend_steam_id])
-            ).group_by(
-                Game.app_id, Game.name
-            ).having(
-                func.count(UserGame.steam_id) == 2
-            ).order_by(
-                desc('user_playtime')
+            # Get games that both users own by finding common app_ids
+            user_games_subq = session.query(UserGame.app_id).filter_by(steam_id=user_steam_id).subquery()
+            friend_games_subq = session.query(UserGame.app_id).filter_by(steam_id=friend_steam_id).subquery()
+            
+            # Find common app_ids
+            common_app_ids = session.query(user_games_subq.c.app_id).intersect(
+                session.query(friend_games_subq.c.app_id)
             ).all()
+            
+            if not common_app_ids:
+                return {
+                    'user_steam_id': user_steam_id,
+                    'friend_steam_id': friend_steam_id,
+                    'common_games': []
+                }
+            
+            common_app_id_list = [app_id[0] for app_id in common_app_ids]
+            
+            # Get user playtime for common games
+            user_playtimes = session.query(
+                UserGame.app_id, UserGame.playtime_forever
+            ).filter(
+                and_(
+                    UserGame.steam_id == user_steam_id,
+                    UserGame.app_id.in_(common_app_id_list)
+                )
+            ).all()
+            
+            # Get friend playtime for common games  
+            friend_playtimes = session.query(
+                UserGame.app_id, UserGame.playtime_forever
+            ).filter(
+                and_(
+                    UserGame.steam_id == friend_steam_id,
+                    UserGame.app_id.in_(common_app_id_list)
+                )
+            ).all()
+            
+            # Create lookup dictionaries
+            user_playtime_dict = {pt.app_id: pt.playtime_forever for pt in user_playtimes}
+            friend_playtime_dict = {pt.app_id: pt.playtime_forever for pt in friend_playtimes}
+            
+            # Get game names
+            games = session.query(Game.app_id, Game.name).filter(
+                Game.app_id.in_(common_app_id_list)
+            ).all()
+            
+            # Build result list
+            common_games = []
+            for game in games:
+                user_playtime = user_playtime_dict.get(game.app_id, 0)
+                friend_playtime = friend_playtime_dict.get(game.app_id, 0)
+                common_games.append({
+                    'appid': game.app_id,
+                    'name': game.name,
+                    'user_playtime_hours': round(user_playtime / 60, 1) if user_playtime else 0,
+                    'friend_playtime_hours': round(friend_playtime / 60, 1) if friend_playtime else 0
+                })
+            
+            # Sort by user playtime (descending)
+            common_games.sort(key=lambda x: x['user_playtime_hours'], reverse=True)
             
             return {
                 'user_steam_id': user_steam_id,
                 'friend_steam_id': friend_steam_id,
-                'common_games': [
-                    {
-                        'appid': game.app_id,
-                        'name': game.name,
-                        'user_playtime_hours': round(game.user_playtime / 60, 1) if game.user_playtime else 0,
-                        'friend_playtime_hours': round(game.friend_playtime / 60, 1) if game.friend_playtime else 0
-                    }
-                    for game in common_games
-                ]
+                'common_games': common_games
             }
         
         elif data_type == 'who_owns_game':

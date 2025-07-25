@@ -8,8 +8,9 @@ from sqlalchemy.sql import func
 
 Base = declarative_base()
 
-# Get database path from environment or use default
-DB_PATH = os.environ.get('STEAM_LIBRARY_DB', 'steam_library.db')
+# Get database path from environment or use default with absolute path
+default_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'steam_library.db')
+DB_PATH = os.environ.get('STEAM_LIBRARY_DB', default_db_path)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Create engine with performance optimizations
@@ -138,9 +139,6 @@ class UserGame(Base):
     app_id = Column(Integer, ForeignKey('games.app_id'), primary_key=True)
     playtime_forever = Column(Integer, default=0)  # in minutes
     playtime_2weeks = Column(Integer, default=0)   # in minutes
-    last_played = Column(Integer)  # Unix timestamp
-    purchase_date = Column(Integer)
-    purchase_price = Column(Float)
     
     # Relationships
     user = relationship("UserProfile", back_populates="games")
