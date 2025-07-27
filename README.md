@@ -1,6 +1,6 @@
 # Steam Library MCP Server
 
-A Model Context Protocol (MCP) server that provides access to your Steam game library data through Claude Desktop. It includes a helper script to copy your library data locally to a csv file for the MCP server to ingest. 
+A Model Context Protocol (MCP) server that provides access to your Steam game library data through Claude Desktop. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
 
 This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built simply as a learning experience and an example of how to create an MCP server. 
 
@@ -13,6 +13,9 @@ This repo was developed with Claude Code, and I left Claude's config in here for
 - **Library Statistics**: Overview of your entire game library
 - **Recently Played**: See what you've been playing lately
 - **Recommendations**: Get game suggestions based on your playtime patterns
+- **Multi-User Support**: Query multiple Steam users and their libraries
+- **Friends & Social**: Access friends lists, common games, and social features
+- **User Profiles**: Get comprehensive user profile data including Steam level and XP
 
 ## Example Interactions using Claude Desktop (Click the dropdowns to see responses)
 
@@ -65,7 +68,12 @@ Then run the data fetcher:
 python steam_library_fetcher.py
 ```
 
-This will create a `steam_library.csv` file with all your game data.
+This will create a SQLite database (`steam_library.db`) with all your game data and user profile information.
+
+**Optional**: To also fetch friends data:
+```bash
+python steam_library_fetcher.py --friends
+```
 
 ### 3. Configure Claude Desktop
 
@@ -80,7 +88,7 @@ Edit `claude_desktop_config.json` and update the paths to match your system:
 ```json
 {
   "mcpServers": {
-    "Steam Library": {
+    "steam-librarian": {
       "command": "/path/to/your/python",
       "args": ["/path/to/your/steam-librarian/mcp_server.py"],
       "env": {}
@@ -121,31 +129,40 @@ Once configured, you can ask Claude Desktop questions like:
 
 ## Available Tools
 
-1. **search_games**: Search by name, genre, developer, publisher, review summary, or maturity rating
-2. **filter_games**: Filter by playtime thresholds, review summary, or maturity rating
-3. **get_game_details**: Get comprehensive info about a specific game
-4. **get_game_reviews**: Get detailed review statistics
-5. **get_library_stats**: Overview statistics of your library
-6. **get_recently_played**: Games played in the last 2 weeks
-7. **get_recommendations**: Personalized suggestions based on your playtime
+1. **get_all_users**: List all available user profiles in the database
+2. **get_user_info**: Get comprehensive user profile including Steam level and account details
+3. **search_games**: Search by name, genre, developer, publisher, review summary, or maturity rating
+4. **filter_games**: Filter by playtime thresholds, review summary, or maturity rating
+5. **get_game_details**: Get comprehensive info about a specific game
+6. **get_game_reviews**: Get detailed review statistics
+7. **get_library_stats**: Overview statistics of your library
+8. **get_recently_played**: Games played in the last 2 weeks
+9. **get_recommendations**: Personalized suggestions based on your playtime
+10. **get_friends_data**: Access friends lists, common games, and social features
 
 ## Data Source
 
-The server reads from `steam_library.csv` which should contain columns:
-- appid, name, maturity_rating, review_summary, review_score, total_reviews
-- positive_reviews, negative_reviews, genres, categories, developers, publishers
-- release_date, playtime_forever, playtime_2weeks, rtime_last_played
+The server uses a SQLite database (`steam_library.db`) with the following structure:
+- **Games**: Game details, ratings, reviews, genres, developers, publishers
+- **User Profiles**: Steam user information, levels, XP, location data
+- **User Games**: Per-user playtime and ownership data
+- **Friends**: Social relationships and friend data
+- **Reviews**: Detailed review statistics and summaries
+
+The database is automatically created and managed by the fetcher script.
 
 ## Troubleshooting
 
 1. **Server not connecting**: Check that the path in your Claude Desktop config is correct
-2. **CSV not found**: Ensure `steam_library.csv` is in the same directory as the server script
-3. **Permission errors**: Make sure Python has read access to the CSV file
-4. **Port conflicts**: The server uses port 8000 by default - ensure it's available
+2. **Database not found**: Run `python steam_library_fetcher.py` to create the SQLite database
+3. **Permission errors**: Make sure Python has read/write access to the database file
+4. **No data returned**: Ensure you've run the fetcher and the database contains your Steam data
+5. **Multiple users**: Use `get_all_users` tool to see available users if queries ask for user selection
 
 ## Technical Details
 
-- Built using the official MCP Python SDK
-- Uses FastAPI for web transport with SSE (Server-Sent Events)
-- Pandas for efficient CSV data processing
-- Runs on all network interfaces (0.0.0.0) for flexibility
+- Built using FastMCP (official MCP Python SDK)
+- Uses STDIO transport for Claude Desktop integration (not HTTP)
+- SQLAlchemy ORM with SQLite database for efficient data storage and querying
+- Multi-user support with proper relational data modeling
+- Comprehensive Steam API integration for fetching library and profile data
