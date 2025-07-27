@@ -1,0 +1,73 @@
+{{- if and .Values.fetcher.enabled .Values.fetcher.runOnStartup }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "steam-librarian.fullname" . }}-fetcher-startup
+  labels:
+    {{- include "steam-librarian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fetcher-startup
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "steam-librarian.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: fetcher-startup
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "steam-librarian.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      containers:
+      - name: fetcher
+        image: "{{ .Values.fetcher.image.repository }}:{{ .Values.fetcher.image.tag }}"
+        imagePullPolicy: {{ .Values.fetcher.image.pullPolicy }}
+        command: ["python", "fetcher/steam_library_fetcher.py"]
+        args:
+        {{- range .Values.fetcher.extraArgs }}
+        - {{ . | quote }}
+        {{- end }}
+        env:
+        - name: STEAM_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "steam-librarian.secretName" . }}
+              key: {{ .Values.steam.existingSecretKeys.steamId }}
+        - name: STEAM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "steam-librarian.secretName" . }}
+              key: {{ .Values.steam.existingSecretKeys.apiKey }}
+        - name: DB_PATH
+          value: "/data/steam_library.db"
+        - name: CACHE_DAYS
+          value: {{ .Values.fetcher.cacheDays | quote }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        {{- with .Values.fetcher.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "steam-librarian.pvcName" . }}
+      {{- with .Values.fetcher.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fetcher.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fetcher.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

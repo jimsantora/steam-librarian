@@ -2,12 +2,15 @@
 """Steam Library MCP Server - Provides access to Steam game library data using SQLite"""
 
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from typing import Annotated, Optional, List, Dict, Any
 from datetime import datetime
 from sqlalchemy import func, and_, or_, desc
 from fastmcp import FastMCP
 
-from database import (
+from shared.database import (
     get_db, get_db_transaction, Game, UserGame, Genre, Developer, Publisher, Category, 
     GameReview, UserProfile, friends_association,
     handle_user_not_found, handle_game_not_found, handle_multiple_users,
@@ -809,4 +812,10 @@ def get_friends_data(
             return {'error': f'Unknown data_type: {data_type}. Use: list, common_games, who_owns_game, library_comparison'}
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(
+        transport="http",
+        host="0.0.0.0",
+        port=8000,
+        path="/mcp/",
+        log_level="info"
+    )

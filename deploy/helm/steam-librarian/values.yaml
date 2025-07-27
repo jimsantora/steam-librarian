@@ -1,0 +1,161 @@
+# Default values for steam-librarian.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  # Storage class for persistent volume
+  storageClass: "longhorn"
+  # Storage size for the database
+  storageSize: "500Mi"
+
+# Steam API Configuration (will be stored as Secret)
+steam:
+  # Steam ID - REQUIRED
+  steamId: ""
+  # Steam API Key - REQUIRED
+  apiKey: ""
+  # Use existing secret (if set, steamId and apiKey above are ignored)
+  existingSecret: ""
+  # Keys in the existing secret
+  existingSecretKeys:
+    steamId: "steam-id"
+    apiKey: "steam-api-key"
+
+# Fetcher CronJob Configuration
+fetcher:
+  enabled: true
+  image:
+    repository: ghcr.io/jimsantora/steam-librarian/fetcher
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # CronJob schedule (daily at 2 AM)
+  schedule: "0 2 * * *"
+  
+  # Run immediately on install/upgrade
+  runOnStartup: true
+  
+  # Job settings
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  
+  # Cache settings
+  cacheDays: 7
+  
+  # Additional arguments for the fetcher
+  extraArgs: []
+  # - "--friends"
+  # - "--force-refresh"
+  
+  # Resources
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations: []
+  
+  # Affinity
+  affinity: {}
+
+# MCP Server Deployment Configuration  
+mcpServer:
+  enabled: true
+  image:
+    repository: ghcr.io/jimsantora/steam-librarian/mcp-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Number of replicas
+  replicaCount: 1
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    annotations: {}
+  
+  # Resources
+  resources: {}
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  
+  # Probes
+  livenessProbe:
+    enabled: false
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    enabled: false
+    httpGet:
+      path: /ready
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations: []
+  
+  # Affinity
+  affinity: {}
+  
+  # Pod annotations
+  podAnnotations: {}
+  
+  # Pod security context
+  podSecurityContext:
+    fsGroup: 2000
+  
+  # Container security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    readOnlyRootFilesystem: false
+
+# Persistent Volume Configuration
+persistence:
+  enabled: true
+  # Use existing PVC
+  existingClaim: ""
+  # Access mode
+  accessMode: ReadWriteOnce
+  # Annotations
+  annotations: {}
+  
+# Image pull secrets
+imagePullSecrets: []
+
+# Service Account
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# Common labels to add to all resources
+commonLabels: {}
+
+# Common annotations to add to all resources
+commonAnnotations: {}

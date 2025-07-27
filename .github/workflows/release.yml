@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.13.0'
+
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Update Chart.yaml version
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        VERSION="${VERSION#v}"  # Remove 'v' prefix
+        sed -i "s/^version:.*/version: ${VERSION}/" deploy/helm/steam-librarian/Chart.yaml
+        sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" deploy/helm/steam-librarian/Chart.yaml
+
+    - name: Package Helm chart
+      run: |
+        helm package deploy/helm/steam-librarian --destination .
+
+    - name: Create Release Notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << EOF
+        ## Steam Librarian ${{ steps.get_version.outputs.VERSION }}
+        
+        ### Docker Images
+        
+        This release includes the following Docker images:
+        
+        - Fetcher: \`ghcr.io/${{ github.repository }}/fetcher:${{ steps.get_version.outputs.VERSION }}\`
+        - MCP Server: \`ghcr.io/${{ github.repository }}/mcp-server:${{ steps.get_version.outputs.VERSION }}\`
+        
+        ### Installation
+        
+        #### Docker Compose
+        \`\`\`bash
+        cd deploy/docker
+        docker-compose pull
+        docker-compose up -d
+        \`\`\`
+        
+        #### Helm
+        \`\`\`bash
+        helm repo add steam-librarian https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}
+        helm install steam-librarian steam-librarian/steam-librarian \\
+          --set steam.steamId=YOUR_STEAM_ID \\
+          --set steam.apiKey=YOUR_API_KEY \\
+          --set fetcher.image.tag=${{ steps.get_version.outputs.VERSION }} \\
+          --set mcpServer.image.tag=${{ steps.get_version.outputs.VERSION }}
+        \`\`\`
+        
+        ### What's Changed
+        
+        See [full changelog](https://github.com/${{ github.repository }}/compare/...${{ steps.get_version.outputs.VERSION }})
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.md
+        files: |
+          steam-librarian-*.tgz
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-helm-values:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: main
+
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Update default image tags in values.yaml
+      run: |
+        sed -i "s|repository: ghcr.io/jimsantora/steam-librarian/fetcher|repository: ghcr.io/${{ github.repository }}/fetcher|" deploy/helm/steam-librarian/values.yaml
+        sed -i "s|repository: ghcr.io/jimsantora/steam-librarian/mcp-server|repository: ghcr.io/${{ github.repository }}/mcp-server|" deploy/helm/steam-librarian/values.yaml
+        sed -i "s|tag: latest|tag: ${{ steps.get_version.outputs.VERSION }}|g" deploy/helm/steam-librarian/values.yaml
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        commit-message: "chore: update Helm chart image tags to ${{ steps.get_version.outputs.VERSION }}"
+        title: "Update Helm chart image tags to ${{ steps.get_version.outputs.VERSION }}"
+        body: |
+          This PR updates the default image tags in the Helm chart to use the newly released version.
+          
+          - Updates fetcher image tag to `${{ steps.get_version.outputs.VERSION }}`
+          - Updates MCP server image tag to `${{ steps.get_version.outputs.VERSION }}`
+          - Updates repository URLs to use ghcr.io
+        branch: update-helm-${{ steps.get_version.outputs.VERSION }}
+        delete-branch: true

@@ -29,7 +29,11 @@ from typing import Dict, List, Optional, Any
 from dotenv import load_dotenv
 import requests
 
-from database import (
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from shared.database import (
     get_db, get_db_transaction, create_database, get_or_create,
     Game, UserGame, Genre, Developer, Publisher, Category, 
     GameReview, UserProfile, friends_association
