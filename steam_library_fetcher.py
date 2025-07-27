@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 import requests
 
 from database import (
-    get_db, create_database, get_or_create,
+    get_db, get_db_transaction, create_database, get_or_create,
     Game, UserGame, Genre, Developer, Publisher, Category, 
     GameReview, UserProfile, friends_association
 )
@@ -314,7 +314,7 @@ class SteamLibraryFetcher:
             steam_id: Steam ID to save
             include_badges: Whether to fetch and save XP/level data (only for main user)
         """
-        with get_db() as session:
+        with get_db_transaction() as session:
             user = session.query(UserProfile).filter_by(steam_id=steam_id).first()
             
             if player_data:
@@ -347,7 +347,6 @@ class SteamLibraryFetcher:
                         avatarmedium=avatarmedium,
                         avatarfull=avatarfull,
                         time_created=time_created,
-                        account_created=time_created,  # For backwards compatibility
                         loccountrycode=loccountrycode,
                         locstatecode=locstatecode,
                         xp=xp,
@@ -364,7 +363,6 @@ class SteamLibraryFetcher:
                     user.avatarmedium = avatarmedium
                     user.avatarfull = avatarfull
                     user.time_created = time_created
-                    user.account_created = time_created  # For backwards compatibility
                     user.loccountrycode = loccountrycode
                     user.locstatecode = locstatecode
                     if include_badges:
@@ -373,7 +371,6 @@ class SteamLibraryFetcher:
                     user.last_updated = int(datetime.now().timestamp())
                     logger.info(f"Updated user profile for: {persona_name} (Steam ID: {steam_id})")
                 
-                session.commit()
             else:
                 # Create minimal profile if API call failed
                 if not user:
@@ -382,7 +379,6 @@ class SteamLibraryFetcher:
                         last_updated=int(datetime.now().timestamp())
                     )
                     session.add(user)
-                    session.commit()
                     logger.info(f"Created minimal user profile for Steam ID: {steam_id}")
         
     def process_game(self, game: Dict, index: int, total: int) -> Dict:
@@ -493,7 +489,7 @@ class SteamLibraryFetcher:
         
     def save_to_database(self, game_data: Dict, steam_id: str):
         """Save game data to SQLite database using SQLAlchemy"""
-        with get_db() as session:
+        with get_db_transaction() as session:
             app_id = game_data['appid']
             skip_details = game_data.get('skip_details', False)
             
@@ -597,7 +593,6 @@ class SteamLibraryFetcher:
             user_game.playtime_forever = max(user_game.playtime_forever, game_data['playtime_forever'])
             user_game.playtime_2weeks = game_data['playtime_2weeks']
         
-        session.commit()
         
     def fetch_library_data(self, steam_id: str):
         """Main method to fetch all library data and save to database"""
@@ -698,7 +693,7 @@ class SteamLibraryFetcher:
     
     def _save_friend_relationships(self, user_steam_id: str, friends: List[Dict]):
         """Save friend relationships to database using association table"""
-        with get_db() as session:
+        with get_db_transaction() as session:
             for friend_data in friends:
                 friend_steam_id = friend_data.get('steamid')
                 relationship = friend_data.get('relationship', 'friend')
@@ -721,8 +716,6 @@ class SteamLibraryFetcher:
                             friend_since=friend_since
                         )
                     )
-            
-            session.commit()
     
     def _process_friends_in_batches(self, friend_ids: List[str], batch_size: int):
         """Process friends' profiles and games in configurable batches"""

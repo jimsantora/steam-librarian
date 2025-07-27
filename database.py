@@ -1,10 +1,11 @@
 import os
 from datetime import datetime
 from contextlib import contextmanager
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Table
+from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, ForeignKey, Table, Index
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
-from sqlalchemy.sql import func
+from sqlalchemy import func
+from typing import Dict, Any, Optional, Union, Callable
 
 Base = declarative_base()
 
@@ -32,6 +33,19 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+@contextmanager
+def get_db_transaction():
+    """Context manager for database sessions with transaction management"""
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()
 
@@ -71,7 +85,9 @@ friends_association = Table(
     Column('user_steam_id', String, ForeignKey('user_profile.steam_id'), primary_key=True),
     Column('friend_steam_id', String, ForeignKey('user_profile.steam_id'), primary_key=True),
     Column('relationship', String),  # 'friend' or 'all'
-    Column('friend_since', Integer)  # Unix timestamp
+    Column('friend_since', Integer),  # Unix timestamp
+    Index('idx_friends_user_steam_id', 'user_steam_id'),
+    Index('idx_friends_friend_steam_id', 'friend_steam_id')
 )
 
 # Models
@@ -85,7 +101,6 @@ class UserProfile(Base):
     avatarmedium = Column(String)  # Medium avatar URL
     avatarfull = Column(String)  # Full avatar URL
     time_created = Column(Integer)  # Account creation timestamp
-    account_created = Column(Integer)  # Deprecated - use time_created
     loccountrycode = Column(String)  # Country code (e.g., "US")
     locstatecode = Column(String)  # State/region code (e.g., "CA")
     xp = Column(Integer)  # Raw XP value
@@ -131,6 +146,12 @@ class Game(Base):
     developers = relationship("Developer", secondary=game_developers, back_populates="games")
     publishers = relationship("Publisher", secondary=game_publishers, back_populates="games")
     categories = relationship("Category", secondary=game_categories, back_populates="games")
+    
+    # Indexes for search and filtering
+    __table_args__ = (
+        Index('idx_games_name', 'name'),
+        Index('idx_games_maturity_rating', 'maturity_rating'),
+    )
 
 class UserGame(Base):
     __tablename__ = 'user_games'
@@ -143,6 +164,14 @@ class UserGame(Base):
     # Relationships
     user = relationship("UserProfile", back_populates="games")
     game = relationship("Game", back_populates="users")
+    
+    # Indexes for common query patterns
+    __table_args__ = (
+        Index('idx_user_games_steam_id', 'steam_id'),
+        Index('idx_user_games_app_id', 'app_id'),
+        Index('idx_user_games_playtime_forever', 'playtime_forever'),
+        Index('idx_user_games_playtime_2weeks', 'playtime_2weeks'),
+    )
     
     @property
     def playtime_hours(self):
@@ -244,3 +273,126 @@ def bulk_insert_or_update(session: Session, model, data_list, unique_fields):
             session.add(instance)
     
     session.commit()
+
+# Error handling utilities
+def create_error_response(error_type: str, message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create a standardized error response format"""
+    response = {
+        'error': True,
+        'error_type': error_type,
+        'message': message
+    }
+    if details:
+        response['details'] = details
+    return response
+
+def create_success_response(data: Any, message: Optional[str] = None) -> Dict[str, Any]:
+    """Create a standardized success response format"""
+    response = {
+        'error': False,
+        'data': data
+    }
+    if message:
+        response['message'] = message
+    return response
+
+def handle_user_not_found(user_identifier: str) -> Dict[str, Any]:
+    """Standard response for user not found scenarios"""
+    return create_error_response(
+        'USER_NOT_FOUND',
+        f'User not found: {user_identifier}. Use get_all_users() to see available users.',
+        {'user_identifier': user_identifier}
+    )
+
+def handle_game_not_found(game_identifier: str) -> Dict[str, Any]:
+    """Standard response for game not found scenarios"""
+    return create_error_response(
+        'GAME_NOT_FOUND',
+        f'Game not found: {game_identifier}',
+        {'game_identifier': game_identifier}
+    )
+
+def handle_multiple_users(users: list) -> Dict[str, Any]:
+    """Standard response for multiple users scenario"""
+    return create_error_response(
+        'MULTIPLE_USERS_FOUND',
+        'Multiple users found. Please specify which user by Steam ID or persona name.',
+        {
+            'available_users': [
+                {
+                    'steam_id': user.steam_id,
+                    'persona_name': user.persona_name or 'Unknown'
+                } for user in users
+            ]
+        }
+    )
+
+def resolve_user_identifier(user_identifier: str, session: Optional[Session] = None) -> Optional[str]:
+    """Resolve a user identifier (Steam ID or persona name) to a Steam ID"""
+    if not user_identifier:
+        return None
+    
+    close_session = False
+    if session is None:
+        session = SessionLocal()
+        close_session = True
+    
+    try:
+        # First, try exact Steam ID match
+        user = session.query(UserProfile).filter_by(steam_id=user_identifier).first()
+        if user:
+            return user.steam_id
+        
+        # Then try case-insensitive persona name match
+        user = session.query(UserProfile).filter(
+            func.lower(UserProfile.persona_name) == func.lower(user_identifier)
+        ).first()
+        if user:
+            return user.steam_id
+        
+        return None
+    finally:
+        if close_session:
+            session.close()
+
+def resolve_user_for_tool(
+    user_steam_id: Optional[str] = None,
+    get_user_steam_id_fallback: Optional[Callable[[], str]] = None
+) -> Dict[str, Any]:
+    """
+    Utility function to resolve user for MCP tools with consistent behavior.
+    
+    Args:
+        user_steam_id: Optional Steam ID or persona name
+        get_user_steam_id_fallback: Optional function to get Steam ID from environment
+    
+    Returns:
+        Dict with either 'steam_id' key or 'error' key with error details
+    """
+    # Resolve user identifier if provided
+    if user_steam_id:
+        resolved_steam_id = resolve_user_identifier(user_steam_id)
+        if not resolved_steam_id:
+            return handle_user_not_found(user_steam_id)
+        return {'steam_id': resolved_steam_id}
+    
+    # Auto-select user if none provided
+    with get_db() as session:
+        users = session.query(UserProfile).all()
+        
+        if len(users) == 1:
+            return {'steam_id': users[0].steam_id}
+        elif len(users) > 1:
+            return handle_multiple_users(users)
+        else:
+            # No users in database, try fallback
+            if get_user_steam_id_fallback:
+                fallback_steam_id = get_user_steam_id_fallback()
+                if fallback_steam_id:
+                    return {'steam_id': fallback_steam_id}
+            
+            return create_error_response(
+                'NO_USERS_FOUND',
+                'No users found in database. Please fetch Steam library data first.',
+                {}
+            )
