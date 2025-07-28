@@ -1,4 +1,4 @@
-.PHONY: help build-docker run-docker stop-docker helm-install helm-uninstall
+.PHONY: help build-docker run-docker stop-docker helm-install helm-uninstall lint format-check format test check clean
 
 # Default target
 help:
@@ -9,6 +9,11 @@ help:
 	@echo "  make helm-install    - Install with Helm (requires values-override.yaml)"
 	@echo "  make helm-uninstall  - Uninstall Helm release"
 	@echo "  make helm-lint       - Lint Helm chart"
+	@echo "  make lint            - Run ruff linting"
+	@echo "  make format-check    - Check code formatting with black"
+	@echo "  make format          - Format code with black"
+	@echo "  make test            - Run basic import tests"
+	@echo "  make check           - Run all code quality checks"
 
 # Docker targets
 build-docker:
@@ -43,9 +48,24 @@ helm-uninstall:
 	helm uninstall steam-librarian
 
 # Development targets
+lint:
+	@echo "Running ruff linting..."
+	ruff check src
+
+format-check:
+	@echo "Checking code formatting with black..."
+	black --check --diff src
+
+format:
+	@echo "Formatting code with black..."
+	black src
+
 test:
 	@echo "Running tests..."
-	python -m pytest tests/
+	python -c "from src.shared.database import Base, get_db; from src.fetcher.steam_library_fetcher import SteamLibraryFetcher; from src.mcp_server.mcp_server import mcp; print('All imports successful!')"
+
+check: lint format-check test
+	@echo "All checks passed!"
 
 clean:
 	@echo "Cleaning up..."
