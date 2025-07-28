@@ -45,6 +45,10 @@ make test
 
 # Clean up cache files
 make clean
+
+# Helm chart validation
+make helm-lint
+make helm-validate  # Requires kubeconform to be installed
 ```
 
 ### Environment Configuration
