@@ -33,7 +33,7 @@ mcp = FastMCP("steam-librarian")
 STEAM_ID = os.environ.get("STEAM_ID", "")
 
 
-@mcp.tool
+@mcp.tool()
 def get_all_users() -> list[dict[str, Any]]:
     """Get list of all available user profiles in the database"""
     with get_db() as session:
@@ -56,7 +56,7 @@ def get_user_steam_id() -> str:
     return ""
 
 
-@mcp.tool
+@mcp.tool()
 def get_user_info(user_steam_id: Annotated[str | None, "Steam ID or persona name of user (leave empty for auto-selection)"] = None) -> dict[str, Any] | None:
     """Get comprehensive user profile information including Steam level, account age, and location"""
     # Use utility function to resolve user
@@ -99,7 +99,7 @@ def get_user_info(user_steam_id: Annotated[str | None, "Steam ID or persona name
         return {"steam_id": user.steam_id, "persona_name": user.persona_name or "Unknown", "profile_url": user.profile_url or "", "steam_level": user.steam_level or 0, "xp": user.xp or 0, "account_age_years": account_age_years, "account_created_date": account_created_date, "location": location, "avatar_urls": {"small": user.avatar_url or "", "medium": user.avatarmedium or "", "large": user.avatarfull or ""}, "library_stats": {"total_games": total_games, "total_playtime_hours": total_playtime_hours}, "last_updated": datetime.fromtimestamp(user.last_updated).strftime("%Y-%m-%d %H:%M:%S") if user.last_updated else "Never"}
 
 
-@mcp.tool
+@mcp.tool()
 def search_games(query: Annotated[str, "Search term to match against game name, genre, developer, or publisher"], user_steam_id: Annotated[str | None, "Steam ID or persona name of user (leave empty for auto-selection)"] = None) -> list[dict[str, Any]]:
     """Search for games by name, genre, developer, or publisher"""
     # Use utility function to resolve user
@@ -118,7 +118,7 @@ def search_games(query: Annotated[str, "Search term to match against game name, 
         return [{"appid": result.app_id, "name": result.name, "genres": result.genres or "", "review_summary": result.review_summary or "Unknown", "playtime_forever_hours": round(result.playtime_forever / 60, 1) if result.playtime_forever else 0} for result in results]
 
 
-@mcp.tool
+@mcp.tool()
 def filter_games(playtime_min: Annotated[float | None, "Minimum playtime in hours"] = None, playtime_max: Annotated[float | None, "Maximum playtime in hours"] = None, review_summary: Annotated[str | None, "Review summary to filter by (e.g., 'Very Positive', 'Overwhelmingly Positive')"] = None, maturity_rating: Annotated[str | None, "Maturity rating to filter by (e.g., 'Everyone', 'Teen (13+)')"] = None, user_steam_id: Annotated[str | None, "Steam ID of user (leave empty to be prompted)"] = None) -> list[dict[str, Any]]:
     """Filter games by playtime, review summary, or maturity rating"""
     # Use utility function to resolve user
@@ -149,7 +149,7 @@ def filter_games(playtime_min: Annotated[float | None, "Minimum playtime in hour
         return [{"appid": result.app_id, "name": result.name, "genres": result.genres or "", "review_summary": result.review_summary or "Unknown", "playtime_forever_hours": round(result.playtime_forever / 60, 1) if result.playtime_forever else 0} for result in results]
 
 
-@mcp.tool
+@mcp.tool()
 def get_game_details(game_identifier: Annotated[str, "Game name or appid to get details for"], user_steam_id: Annotated[str | None, "Steam ID of user (leave empty to be prompted)"] = None) -> dict[str, Any] | None:
     """Get comprehensive details about a specific game"""
     # Use utility function to resolve user
@@ -225,7 +225,7 @@ def get_game_details(game_identifier: Annotated[str, "Game name or appid to get 
         return result
 
 
-@mcp.tool
+@mcp.tool()
 def get_game_reviews(game_identifier: Annotated[str, "Game name or appid to get review data for"], user_steam_id: Annotated[str | None, "Steam ID of user (leave empty to be prompted)"] = None) -> dict[str, Any] | None:
     """Get detailed review statistics for a game"""
     game = get_game_details(game_identifier, user_steam_id)
@@ -239,7 +239,7 @@ def get_game_reviews(game_identifier: Annotated[str, "Game name or appid to get 
     return {"name": game["name"], "appid": game["appid"], "review_summary": game["review_summary"], "review_score": game["review_score"], "total_reviews": game["total_reviews"], "positive_reviews": game["positive_reviews"], "negative_reviews": game["negative_reviews"], "positive_percentage": positive_percentage}
 
 
-@mcp.tool
+@mcp.tool()
 def get_library_stats(user_steam_id: Annotated[str | None, "Steam ID or persona name of user (leave empty for auto-selection)"] = None) -> dict[str, Any]:
     """Get overview statistics about the entire game library"""
     # Use utility function to resolve user
@@ -277,7 +277,7 @@ def get_library_stats(user_steam_id: Annotated[str | None, "Steam ID or persona 
         return {"total_games": total_games, "total_hours_played": total_hours, "average_hours_per_game": avg_hours, "top_genres": top_genres, "top_developers": top_developers, "review_distribution": review_distribution}
 
 
-@mcp.tool
+@mcp.tool()
 def get_recently_played(user_steam_id: Annotated[str | None, "Steam ID of user (leave empty to be prompted)"] = None) -> list[dict[str, Any]]:
     """Get games played in the last 2 weeks"""
     # Use utility function to resolve user
@@ -293,7 +293,7 @@ def get_recently_played(user_steam_id: Annotated[str | None, "Steam ID of user (
         return [{"appid": result.app_id, "name": result.name, "playtime_2weeks_hours": round(result.playtime_2weeks / 60, 1), "playtime_forever_hours": round(result.playtime_forever / 60, 1)} for result in results]
 
 
-@mcp.tool
+@mcp.tool()
 def get_recommendations(user_steam_id: Annotated[str | None, "Steam ID of user (leave empty to be prompted)"] = None) -> list[dict[str, Any]]:
     """Get personalized game recommendations based on playtime patterns"""
     # Use utility function to resolve user
@@ -350,7 +350,7 @@ def get_recommendations(user_steam_id: Annotated[str | None, "Steam ID of user (
         return unique_recs[:10]  # Limit to 10 recommendations
 
 
-@mcp.tool
+@mcp.tool()
 def get_friends_data(data_type: Annotated[str, "Type of data: 'list', 'common_games', 'who_owns_game', 'library_comparison'"], user_steam_id: Annotated[str | None, "Steam ID or persona name of user (leave empty for auto-selection)"] = None, friend_steam_id: Annotated[str | None, "Friend's Steam ID or persona name for specific queries"] = None, game_identifier: Annotated[str | None, "Game name or appid for game-specific queries"] = None) -> dict[str, Any] | None:
     """Unified tool for all friends-related queries"""
 
