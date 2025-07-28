@@ -1,8 +1,11 @@
 import os
+import time
+import logging
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
+from functools import wraps
 
 from sqlalchemy import (
     Boolean,
@@ -17,6 +20,9 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
+from sqlalchemy.exc import DisconnectionError, TimeoutError, StatementError
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -39,6 +45,36 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def db_retry(max_retries: int = 3, base_delay: float = 1.0):
+    """Decorator for database operations with exponential backoff retry logic"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except (DisconnectionError, TimeoutError, StatementError) as e:
+                    last_exception = e
+                    if attempt == max_retries:
+                        logger.error(f"Database operation failed after {max_retries + 1} attempts: {e}")
+                        raise e
+                    
+                    # Exponential backoff with jitter
+                    delay = base_delay * (2 ** attempt) + (time.time() % 1)  # Add jitter
+                    logger.warning(f"Database connection failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {delay:.2f}s: {e}")
+                    time.sleep(delay)
+                except Exception as e:
+                    # Don't retry non-connection errors
+                    raise e
+            
+            # Should never reach here, but just in case
+            raise last_exception
+        return wrapper
+    return decorator
+
+
 @contextmanager
 def get_db():
     """Context manager for database sessions"""
@@ -50,8 +86,9 @@ def get_db():
 
 
 @contextmanager
+@db_retry(max_retries=3, base_delay=1.0)
 def get_db_transaction():
-    """Context manager for database sessions with transaction management"""
+    """Context manager for database sessions with transaction management and retry logic"""
     db = SessionLocal()
     try:
         yield db

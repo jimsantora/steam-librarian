@@ -498,16 +498,16 @@ class SteamLibraryFetcher:
                         review.negative_reviews = game_data.get("negative_reviews", 0)
                         review.last_updated = int(datetime.now().timestamp())
 
-        # Handle user game data (always update this regardless of skip_details)
-        user_game = session.query(UserGame).filter_by(steam_id=steam_id, app_id=app_id).first()
+            # Handle user game data (always update this regardless of skip_details)
+            user_game = session.query(UserGame).filter_by(steam_id=steam_id, app_id=app_id).first()
 
-        if not user_game:
-            user_game = UserGame(steam_id=steam_id, app_id=app_id, playtime_forever=game_data["playtime_forever"], playtime_2weeks=game_data["playtime_2weeks"])
-            session.add(user_game)
-        else:
-            # Update playtime data
-            user_game.playtime_forever = max(user_game.playtime_forever, game_data["playtime_forever"])
-            user_game.playtime_2weeks = game_data["playtime_2weeks"]
+            if not user_game:
+                user_game = UserGame(steam_id=steam_id, app_id=app_id, playtime_forever=game_data["playtime_forever"], playtime_2weeks=game_data["playtime_2weeks"])
+                session.add(user_game)
+            else:
+                # Update playtime data
+                user_game.playtime_forever = max(user_game.playtime_forever, game_data["playtime_forever"])
+                user_game.playtime_2weeks = game_data["playtime_2weeks"]
 
     def fetch_library_data(self, steam_id: str):
         """Main method to fetch all library data and save to database"""
