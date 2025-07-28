@@ -5,15 +5,15 @@
 <h1 align="center">Steam Librarian</h1>
 
 <p align="center">
+  <em><strong>Your personal game archivist and curator.</strong> They know your library inside and out, can compare collections with friends, suggest your next adventure, and share deep insights about every game on your digital shelves.</em>
+</p>
+
+<p align="center">
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11-blue.svg" alt="Python 3.11"></a>
   <a href="https://hub.docker.com/r/jimsantora/steam-librarian"><img src="https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white" alt="Docker"></a>
   <a href="https://kubernetes.io/"><img src="https://img.shields.io/badge/kubernetes-%23326ce5.svg?logo=kubernetes&logoColor=white" alt="Kubernetes"></a>
   <a href="https://github.com/anthropics/mcp"><img src="https://img.shields.io/badge/MCP-Protocol-green" alt="MCP Protocol"></a>
-</p>
-
-<p align="center">
-  <em><strong>Your personal game archivist and curator.</strong> They know your library inside and out, can compare collections with friends, suggest your next adventure, and share deep insights about every game on your digital shelves.</em>
 </p>
 
 A Model Context Protocol (MCP) server that provides access to your Steam library data via a streamable HTTP interface. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
