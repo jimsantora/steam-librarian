@@ -9,6 +9,7 @@ help:
 	@echo "  make helm-install    - Install with Helm (requires values-override.yaml)"
 	@echo "  make helm-uninstall  - Uninstall Helm release"
 	@echo "  make helm-lint       - Lint Helm chart"
+	@echo "  make helm-validate   - Validate Helm chart with kubeconform"
 	@echo "  make lint            - Run ruff linting"
 	@echo "  make format-check    - Check code formatting with black"
 	@echo "  make format          - Format code with black"
@@ -33,6 +34,13 @@ stop-docker:
 helm-lint:
 	@echo "Linting Helm chart..."
 	helm lint deploy/helm/steam-librarian
+
+helm-validate:
+	@echo "Validating Helm chart with kubeconform..."
+	helm template test deploy/helm/steam-librarian \
+		--set steam.steamId=test-id \
+		--set steam.apiKey=test-key \
+		| kubeconform -strict -ignore-missing-schemas
 
 helm-install:
 	@echo "Installing Steam Librarian with Helm..."

@@ -42,11 +42,19 @@ spec:
           protocol: TCP
         {{- if .Values.mcpServer.livenessProbe.enabled }}
         livenessProbe:
-          {{- toYaml .Values.mcpServer.livenessProbe | nindent 12 }}
+          httpGet:
+            path: {{ .Values.mcpServer.livenessProbe.httpGet.path }}
+            port: {{ .Values.mcpServer.livenessProbe.httpGet.port }}
+          initialDelaySeconds: {{ .Values.mcpServer.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.mcpServer.livenessProbe.periodSeconds }}
         {{- end }}
         {{- if .Values.mcpServer.readinessProbe.enabled }}
         readinessProbe:
-          {{- toYaml .Values.mcpServer.readinessProbe | nindent 12 }}
+          httpGet:
+            path: {{ .Values.mcpServer.readinessProbe.httpGet.path }}
+            port: {{ .Values.mcpServer.readinessProbe.httpGet.port }}
+          initialDelaySeconds: {{ .Values.mcpServer.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.mcpServer.readinessProbe.periodSeconds }}
         {{- end }}
         env:
         - name: DB_PATH
