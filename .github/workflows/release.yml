@@ -109,8 +109,8 @@ jobs:
     - name: Update default image tags in values.yaml
       run: |
         # Create temporary file for cross-platform compatibility
-        # Update image tags (preserve 'v' prefix)
-        sed "s|tag: v.*|tag: v${{ steps.get_version.outputs.VERSION }}|g" deploy/helm/steam-librarian/values.yaml > values.tmp
+        # Update image tags (standard semantic versioning without 'v')
+        sed "s|tag: [0-9]*\.[0-9]*\.[0-9]*|tag: ${{ steps.get_version.outputs.VERSION }}|g" deploy/helm/steam-librarian/values.yaml > values.tmp
         # Update repository URLs if needed  
         sed "s|ghcr.io/jimsantora/steam-librarian/|ghcr.io/${{ github.repository }}/|g" values.tmp > deploy/helm/steam-librarian/values.yaml
         # Clean up
