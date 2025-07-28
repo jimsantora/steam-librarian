@@ -1,0 +1,83 @@
+name: Python Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'requirements.txt'
+      - '.github/workflows/python-test.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'requirements.txt'
+      - '.github/workflows/python-test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov ruff black
+
+    - name: Lint with ruff
+      run: |
+        # Check for syntax errors and other issues
+        ruff check src --output-format=github
+        
+    - name: Check formatting with black
+      run: |
+        # Check if code is formatted according to black standards
+        black --check --diff src
+
+    - name: Run basic tests
+      run: |
+        # Create a basic test to ensure the code structure is valid
+        cat > test_basic.py << EOF
+        import sys
+        import os
+        sys.path.insert(0, os.path.abspath('.'))
+        
+        def test_imports():
+            """Test that all modules can be imported"""
+            from src.shared.database import Base, get_db
+            from src.fetcher.steam_library_fetcher import SteamLibraryFetcher
+            from src.mcp_server.mcp_server import mcp
+            assert True
+            
+        def test_database_models():
+            """Test that database models are defined"""
+            from src.shared.database import Game, UserGame, Genre, Developer
+            assert Game.__tablename__ == 'games'
+            assert UserGame.__tablename__ == 'user_games'
+            
+        if __name__ == "__main__":
+            test_imports()
+            test_database_models()
+            print("All tests passed!")
+        EOF
+        
+        python test_basic.py

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Steam Library Fetcher - runs periodically to update data
+  fetcher:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.fetcher
+    environment:
+      - STEAM_ID=${STEAM_ID}
+      - STEAM_API_KEY=${STEAM_API_KEY}
+      - DB_PATH=/data/steam_library.db
+      - CACHE_DAYS=7
+    volumes:
+      - steam-data:/data
+    restart: "no"
+    command: ["python", "fetcher/steam_library_fetcher.py"]
+
+  # MCP Server - provides the MCP interface
+  mcp-server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.mcp_server
+    environment:
+      - DB_PATH=/data/steam_library.db
+      - STEAM_ID=${STEAM_ID}  # Optional fallback
+    volumes:
+      - steam-data:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      - fetcher
+
+  # Optional: Run fetcher periodically using a cron-like service
+  fetcher-cron:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.fetcher
+    environment:
+      - STEAM_ID=${STEAM_ID}
+      - STEAM_API_KEY=${STEAM_API_KEY}
+      - DB_PATH=/data/steam_library.db
+      - CACHE_DAYS=7
+    volumes:
+      - steam-data:/data
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command: 
+      - |
+        while true; do
+          echo "Running Steam Library Fetcher at $$(date)"
+          python fetcher/steam_library_fetcher.py
+          echo "Fetcher completed. Sleeping for 24 hours..."
+          sleep 86400
+        done
+
+volumes:
+  steam-data:
+    driver: local

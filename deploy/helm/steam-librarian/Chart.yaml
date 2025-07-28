@@ -1,0 +1,16 @@
+apiVersion: v2
+name: steam-librarian
+description: A Helm chart for Steam Library MCP Server on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - steam
+  - mcp
+  - game-library
+maintainers:
+  - name: Jim Santora
+    email: jim@example.com
+sources:
+  - https://github.com/jimsantora/steam-librarian
+home: https://github.com/jimsantora/steam-librarian

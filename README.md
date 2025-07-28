@@ -65,14 +65,14 @@ STEAM_API_KEY=your_steam_api_key_here
 Then run the data fetcher:
 
 ```bash
-python steam_library_fetcher.py
+python src/fetcher/steam_library_fetcher.py
 ```
 
 This will create a SQLite database (`steam_library.db`) with all your game data and user profile information.
 
 **Optional**: To also fetch friends data:
 ```bash
-python steam_library_fetcher.py --friends
+python src/fetcher/steam_library_fetcher.py --friends
 ```
 
 ### 3. Configure Claude Desktop
@@ -90,7 +90,7 @@ Edit `claude_desktop_config.json` and update the paths to match your system:
   "mcpServers": {
     "steam-librarian": {
       "command": "/path/to/your/python",
-      "args": ["/path/to/your/steam-librarian/mcp_server.py"],
+      "args": ["/path/to/your/steam-librarian/src/mcp_server/mcp_server.py"],
       "env": {}
     }
   }
@@ -108,7 +108,7 @@ Then copy it to Claude Desktop's configuration location:
 You can test the server directly:
 
 ```bash
-python mcp_server.py
+python src/mcp_server/mcp_server.py
 ```
 
 ### 5. Restart Claude Desktop
@@ -154,7 +154,7 @@ The database is automatically created and managed by the fetcher script.
 ## Troubleshooting
 
 1. **Server not connecting**: Check that the path in your Claude Desktop config is correct
-2. **Database not found**: Run `python steam_library_fetcher.py` to create the SQLite database
+2. **Database not found**: Run `python src/fetcher/steam_library_fetcher.py` to create the SQLite database
 3. **Permission errors**: Make sure Python has read/write access to the database file
 4. **No data returned**: Ensure you've run the fetcher and the database contains your Steam data
 5. **Multiple users**: Use `get_all_users` tool to see available users if queries ask for user selection
@@ -166,3 +166,37 @@ The database is automatically created and managed by the fetcher script.
 - SQLAlchemy ORM with SQLite database for efficient data storage and querying
 - Multi-user support with proper relational data modeling
 - Comprehensive Steam API integration for fetching library and profile data
+
+## Project Structure
+
+```
+steam-librarian/
+├── src/                      # Source code
+│   ├── fetcher/             # Steam library data fetcher service
+│   │   └── steam_library_fetcher.py
+│   ├── mcp_server/          # MCP server service
+│   │   └── mcp_server.py
+│   └── shared/              # Shared code between services
+│       └── database.py      # SQLAlchemy models and DB utilities
+├── deploy/                  # Deployment configurations
+│   ├── docker/             # Docker configurations
+│   │   ├── Dockerfile.fetcher
+│   │   ├── Dockerfile.mcp_server
+│   │   └── docker-compose.yml
+│   └── helm/               # Helm charts
+│       └── steam-librarian/
+│           ├── Chart.yaml
+│           ├── values.yaml
+│           └── templates/
+├── docs/                   # Documentation
+├── images/                 # Images and assets
+├── requirements.txt        # Python dependencies
+├── .env.example           # Environment variables template
+└── README.md              # Main project documentation
+```
+
+### Service Architecture
+
+- **Fetcher Service**: Runs as a CronJob in Kubernetes, fetches Steam data via API
+- **MCP Server**: Runs as a Deployment, provides MCP interface to Steam data
+- **Shared Storage**: SQLite database on persistent volume shared between services

@@ -11,6 +11,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.ruff_cache/
 
 # Output files
 *.csv
@@ -19,6 +20,21 @@ ENV/
 # Configuration files with personal paths
 claude_desktop_config.json
 .claude
+
+# Docker
+deploy/docker/.env
+deploy/docker/*.env
+!deploy/docker/.env.example
+
+# Helm
+deploy/helm/steam-librarian/values-*.yaml
+!deploy/helm/steam-librarian/values.yaml
+deploy/helm/steam-librarian/charts/
+deploy/helm/steam-librarian/*.tgz
+
+# Build artifacts
+*.tar
+*.tar.gz
 
 # IDE
 .vscode/
