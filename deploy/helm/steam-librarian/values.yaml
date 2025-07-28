@@ -33,9 +33,6 @@ fetcher:
   # CronJob schedule (daily at 2 AM)
   schedule: "0 2 * * *"
   
-  # Run immediately on install/upgrade
-  runOnStartup: true
-  
   # Job settings
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
