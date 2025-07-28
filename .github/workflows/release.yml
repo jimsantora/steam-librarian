@@ -108,9 +108,13 @@ jobs:
 
     - name: Update default image tags in values.yaml
       run: |
-        sed -i "s|repository: ghcr.io/jimsantora/steam-librarian/fetcher|repository: ghcr.io/${{ github.repository }}/fetcher|" deploy/helm/steam-librarian/values.yaml
-        sed -i "s|repository: ghcr.io/jimsantora/steam-librarian/mcp-server|repository: ghcr.io/${{ github.repository }}/mcp-server|" deploy/helm/steam-librarian/values.yaml
-        sed -i "s|tag: latest|tag: ${{ steps.get_version.outputs.VERSION }}|g" deploy/helm/steam-librarian/values.yaml
+        # Create temporary file for cross-platform compatibility
+        # Update image tags (preserve 'v' prefix)
+        sed "s|tag: v.*|tag: v${{ steps.get_version.outputs.VERSION }}|g" deploy/helm/steam-librarian/values.yaml > values.tmp
+        # Update repository URLs if needed  
+        sed "s|ghcr.io/jimsantora/steam-librarian/|ghcr.io/${{ github.repository }}/|g" values.tmp > deploy/helm/steam-librarian/values.yaml
+        # Clean up
+        rm values.tmp
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v5
