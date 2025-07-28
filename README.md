@@ -2,7 +2,7 @@
   <img src="images/steam_librarian_logo_512x512.png" alt="Steam Librarian Logo" width="256" height="256">
 </p>
 
-# Steam Library MCP Server
+# Steam Librarian
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -12,7 +12,11 @@
   <a href="https://github.com/anthropics/mcp"><img src="https://img.shields.io/badge/MCP-Protocol-green" alt="MCP Protocol"></a>
 </p>
 
-A Model Context Protocol (MCP) server that provides access to your Steam game library data through an HTTP API. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
+<p align="center">
+  <em><strong>Your personal game archivist and curator.</strong> They know your library inside and out, can compare collections with friends, suggest your next adventure, and share deep insights about every game on your digital shelves.</em>
+</p>
+
+A Model Context Protocol (MCP) server that provides access to your Steam library data via a streamable HTTP interface. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
 
 This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built simply as a learning experience and an example of how to create an MCP server. 
 
