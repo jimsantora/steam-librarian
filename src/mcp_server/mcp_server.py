@@ -463,4 +463,4 @@ def get_friends_data(data_type: Annotated[str, "Type of data: 'list', 'common_ga
 
 
 if __name__ == "__main__":
-    mcp.run(transport="http", host="0.0.0.0", port=8000, path="/mcp/", log_level="info")
+    mcp.run(transport="http", host="0.0.0.0", port=8000, path="/mcp")
