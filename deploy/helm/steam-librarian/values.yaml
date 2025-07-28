@@ -27,7 +27,7 @@ fetcher:
   enabled: true
   image:
     repository: ghcr.io/jimsantora/steam-librarian/fetcher
-    tag: 0.5.1
+    tag: 0.6.2
     pullPolicy: IfNotPresent
   
   # CronJob schedule (daily at 2 AM)
@@ -68,7 +68,7 @@ mcpServer:
   enabled: true
   image:
     repository: ghcr.io/jimsantora/steam-librarian/mcp-server
-    tag: 0.5.0
+    tag: 0.6.2
     pullPolicy: IfNotPresent
   
   # Number of replicas
