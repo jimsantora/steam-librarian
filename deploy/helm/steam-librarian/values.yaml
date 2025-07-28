@@ -92,18 +92,18 @@ mcpServer:
   
   # Probes
   livenessProbe:
-    enabled: false
+    enabled: true
     httpGet:
       path: /health
-      port: 8000
+      port: http
     initialDelaySeconds: 30
-    periodSeconds: 10
+    periodSeconds: 30
   
   readinessProbe:
-    enabled: false
+    enabled: true
     httpGet:
-      path: /ready
-      port: 8000
+      path: /health
+      port: http
     initialDelaySeconds: 5
     periodSeconds: 5
   

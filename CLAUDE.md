@@ -134,8 +134,8 @@ steam-librarian/
 - Server name: "steam-librarian"
 - Transport: HTTP (streamable responses)
 - Default port: 8000 (configurable)
-- Base URL: `http://localhost:8000`
-- Health check endpoint: `/health`
+- MCP endpoint: `http://0.0.0.0:8000/mcp`
+- Health check endpoint: `http://0.0.0.0:8000/health`
 
 ## Deployment Options
 

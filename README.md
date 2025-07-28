@@ -1,6 +1,6 @@
 # Steam Library MCP Server
 
-A Model Context Protocol (MCP) server that provides access to your Steam game library data through Claude Desktop. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
+A Model Context Protocol (MCP) server that provides access to your Steam game library data through an HTTP API. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
 
 This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built simply as a learning experience and an example of how to create an MCP server. 
 
@@ -17,7 +17,7 @@ This repo was developed with Claude Code, and I left Claude's config in here for
 - **Friends & Social**: Access friends lists, common games, and social features
 - **User Profiles**: Get comprehensive user profile data including Steam level and XP
 
-## Example Interactions using Claude Desktop (Click the dropdowns to see responses)
+## Example Interactions (Click the dropdowns to see responses)
 
 <details>
 <summary>Suggest games based on recent play history<br><img src="images/recent_games_question.png"/></summary>
@@ -75,49 +75,28 @@ This will create a SQLite database (`steam_library.db`) with all your game data 
 python src/fetcher/steam_library_fetcher.py --friends
 ```
 
-### 3. Configure Claude Desktop
+### 3. Run the MCP Server
 
-Copy the example configuration file and update the paths:
-
-```bash
-cp claude_desktop_config.example.json claude_desktop_config.json
-```
-
-Edit `claude_desktop_config.json` and update the paths to match your system:
-
-```json
-{
-  "mcpServers": {
-    "steam-librarian": {
-      "command": "/path/to/your/python",
-      "args": ["/path/to/your/steam-librarian/src/mcp_server/mcp_server.py"],
-      "env": {}
-    }
-  }
-}
-```
-
-Then copy it to Claude Desktop's configuration location:
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Linux**: `~/.config/claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\claude\claude_desktop_config.json`
-
-### 4. Test the Server
-
-You can test the server directly:
+Start the HTTP server:
 
 ```bash
 python src/mcp_server/mcp_server.py
 ```
 
-### 5. Restart Claude Desktop
+The server will start on `http://0.0.0.0:8000/mcp`.
 
-After updating the configuration file, restart Claude Desktop to load the MCP server.
+### 4. Verify the Server is Running
+
+The server will output logs indicating it's running on `http://0.0.0.0:8000/mcp`.
+
+You can also check the health endpoint:
+```bash
+curl http://localhost:8000/health
+```
 
 ## Usage Examples
 
-Once configured, you can ask Claude Desktop questions like:
+The MCP server provides tools that can answer questions like:
 
 - "What are my top 10 most played games?"
 - "Show me all my puzzle games" 
@@ -153,7 +132,7 @@ The database is automatically created and managed by the fetcher script.
 
 ## Troubleshooting
 
-1. **Server not connecting**: Check that the path in your Claude Desktop config is correct
+1. **Server not connecting**: Check that the server is running on the correct port
 2. **Database not found**: Run `python src/fetcher/steam_library_fetcher.py` to create the SQLite database
 3. **Permission errors**: Make sure Python has read/write access to the database file
 4. **No data returned**: Ensure you've run the fetcher and the database contains your Steam data
@@ -162,10 +141,11 @@ The database is automatically created and managed by the fetcher script.
 ## Technical Details
 
 - Built using FastMCP (official MCP Python SDK)
-- Uses STDIO transport for Claude Desktop integration (not HTTP)
+- Uses HTTP transport with streamable responses
 - SQLAlchemy ORM with SQLite database for efficient data storage and querying
 - Multi-user support with proper relational data modeling
 - Comprehensive Steam API integration for fetching library and profile data
+- RESTful API endpoints for MCP tool invocation
 
 ## Project Structure
 
@@ -200,3 +180,60 @@ steam-librarian/
 - **Fetcher Service**: Runs as a CronJob in Kubernetes, fetches Steam data via API
 - **MCP Server**: Runs as a Deployment, provides MCP interface to Steam data
 - **Shared Storage**: SQLite database on persistent volume shared between services
+
+## Deployment Options
+
+### Local Development
+```bash
+# Run directly with Python
+python src/mcp_server/mcp_server.py
+```
+
+### Docker
+```bash
+# Build and run with Docker Compose
+make build-docker
+make run-docker
+
+# Stop services
+make stop-docker
+```
+
+### Kubernetes with Helm
+```bash
+# Create values override file
+cp deploy/helm/steam-librarian/values.yaml deploy/helm/steam-librarian/values-override.yaml
+# Edit values-override.yaml with your Steam credentials
+
+# Install with Helm
+helm install steam-librarian deploy/helm/steam-librarian -f deploy/helm/steam-librarian/values-override.yaml
+
+# Manual data fetch (since startup job was removed)
+kubectl create job --from=cronjob/steam-librarian-fetcher manual-fetch-$(date +%s)
+```
+
+## Using the MCP Server
+
+This MCP server uses the Model Context Protocol, which requires an MCP client to interact with it. The server exposes tools that can be called by MCP clients such as:
+
+- Claude Desktop (with appropriate configuration)
+- MCP-compatible AI assistants
+- Custom MCP clients using the MCP SDK
+
+The server runs on port 8000 by default with the following endpoints:
+- `http://0.0.0.0:8000/mcp` - MCP protocol endpoint (HTTP transport with SSE)
+- `http://0.0.0.0:8000/health` - Health check endpoint for monitoring
+
+### Available MCP Tools
+
+The server exposes these tools through the MCP protocol:
+- `get_all_users` - List all Steam users in the database
+- `search_games` - Search games by name, genre, developer, etc.
+- `filter_games` - Filter games by playtime, reviews, or rating
+- `get_game_details` - Get detailed information about a specific game
+- `get_game_reviews` - Get review statistics for a game
+- `get_library_stats` - Get overall library statistics
+- `get_recently_played` - Get recently played games
+- `get_recommendations` - Get personalized game recommendations
+- `get_user_info` - Get user profile information
+- `get_friends_data` - Get friends and social data

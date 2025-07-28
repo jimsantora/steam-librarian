@@ -11,6 +11,8 @@ from typing import Annotated, Any
 
 from fastmcp import FastMCP
 from sqlalchemy import and_, desc, func, or_
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
 from shared.database import (
     Developer,
@@ -31,6 +33,12 @@ mcp = FastMCP("steam-librarian")
 
 # Get Steam ID from environment (fallback for backwards compatibility)
 STEAM_ID = os.environ.get("STEAM_ID", "")
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> PlainTextResponse:
+    """Health check endpoint for liveness/readiness probes"""
+    return PlainTextResponse("OK")
 
 
 @mcp.tool()
