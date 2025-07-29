@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from sqlalchemy import and_, desc, func, or_
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -472,4 +472,4 @@ def get_friends_data(data_type: Annotated[str, "Type of data: 'list', 'common_ga
 
 if __name__ == "__main__":
     # Bind to 0.0.0.0 for Docker container access
-    mcp.run(transport="http", host="0.0.0.0", port=8000, path="/mcp")
+    mcp.run(transport="streamable-http")
