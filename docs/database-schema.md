@@ -20,25 +20,32 @@ Steam Library Database Schema
 │ avatarmedium    │ │   │ content_desc... │  │  │ positive_reviews│
 │ avatarfull      │ │   │ release_date    │  │  │ negative_reviews│
 │ time_created    │ │   │ metacritic_score│  │  │ last_updated    │
-│ account_created │ │   │ steam_deck_ver. │  │  └─────────────────┘
-│ loccountrycode  │ │   │ controller_sup. │  │
-│ locstatecode    │ │   │ vr_support      │  │
-│ xp              │ │   │ last_updated    │  │
-│ steam_level     │ │   └─────────────────┘  │
-│ last_updated    │ │                        │
+│ loccountrycode  │ │   │ steam_deck_ver. │  │  └─────────────────┘
+│ locstatecode    │ │   │ controller_sup. │  │
+│ xp              │ │   │ vr_support      │  │
+│ steam_level     │ │   │ last_updated    │  │
+│ last_updated    │ │   └─────────────────┘  │
 └─────────────────┘ │                        │
-                    │                        │
-                    │   ┌─────────────────┐  │
-                    └──│   user_games    │  │
-                        ├─────────────────┤  │
-                        │ steam_id (PK,FK)│  │
-                        │ app_id (PK,FK)  │──┘
-                        │ playtime_forever│
-                        │ playtime_2weeks │
-                        │ last_played     │
-                        │ purchase_date   │
-                        │ purchase_price  │
-                        └─────────────────┘
+         │          │                        │
+         │          │   ┌─────────────────┐  │
+         │          └──-│   user_games    │  │
+         │              ├─────────────────┤  │
+         │              │ steam_id (PK,FK)│  │
+         │              │ app_id (PK,FK)  │──┘
+         │              │ playtime_forever│
+         │              │ playtime_2weeks │
+         │              └─────────────────┘
+         │
+         │   ┌─────────────────┐
+         └──-│     friends     │
+             ├─────────────────┤
+             │ user_steam_id   │
+             │ (PK,FK)         │
+             │ friend_steam_id │
+             │ (PK,FK)         │
+             │ relationship    │
+             │ friend_since    │
+             └─────────────────┘
 
 Many-to-Many Relationship Tables:
                         
@@ -90,7 +97,6 @@ Stores Steam user account information.
 | `avatarmedium` | STRING | Medium profile avatar image URL |
 | `avatarfull` | STRING | Full/large profile avatar image URL |
 | `time_created` | INTEGER | Unix timestamp of account creation |
-| `account_created` | INTEGER | Deprecated - use time_created |
 | `loccountrycode` | STRING | Country code (e.g., "US") if public |
 | `locstatecode` | STRING | State/region code (e.g., "CA") if public |
 | `xp` | INTEGER | Raw Steam XP value |
@@ -123,9 +129,6 @@ Junction table linking users to their owned games with playtime data.
 | `app_id` | INTEGER (PK, FK) | References `games.app_id` |
 | `playtime_forever` | INTEGER | Total playtime in minutes |
 | `playtime_2weeks` | INTEGER | Recent playtime in minutes |
-| `last_played` | INTEGER | Unix timestamp of last play session |
-| `purchase_date` | INTEGER | Unix timestamp of purchase |
-| `purchase_price` | FLOAT | Purchase price in user's currency |
 
 #### `game_reviews`
 Review and rating data for games (one-to-one with games).
@@ -182,10 +185,21 @@ Steam categories (Single-player, Multiplayer, etc.).
 | `game_categories` | `app_id` | INTEGER (PK, FK) | References `games.app_id` |
 | `game_categories` | `category_id` | INTEGER (PK, FK) | References `categories.category_id` |
 
+### `friends`
+Association table for user friendships.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `user_steam_id` | STRING (PK, FK) | References `user_profile.steam_id` |
+| `friend_steam_id` | STRING (PK, FK) | References `user_profile.steam_id` |
+| `relationship` | STRING | Relationship type (e.g., "friend", "all") |
+| `friend_since` | INTEGER | Unix timestamp when friendship began |
+
 ## Relationships
 
 ### Key Relationships
 - **user_profile ──< user_games >── games**: Many-to-Many through user_games junction table
+- **user_profile ──< friends >── user_profile**: Many-to-Many self-referencing friendship table
 - **games ──< game_reviews**: One-to-One relationship
 - **games ──< game_genres >── genres**: Many-to-Many relationship
 - **games ──< game_developers >── developers**: Many-to-Many relationship  
@@ -204,10 +218,19 @@ Steam categories (Single-player, Multiplayer, etc.).
 The following indexes are automatically created for performance optimization:
 
 ```sql
-CREATE INDEX idx_user_games_playtime ON user_games(playtime_forever DESC);
-CREATE INDEX idx_user_games_recent ON user_games(playtime_2weeks DESC);
+-- Game indexes
 CREATE INDEX idx_games_name ON games(name);
-CREATE INDEX idx_game_reviews_summary ON game_reviews(review_summary);
+CREATE INDEX idx_games_maturity_rating ON games(maturity_rating);
+
+-- User games indexes
+CREATE INDEX idx_user_games_steam_id ON user_games(steam_id);
+CREATE INDEX idx_user_games_app_id ON user_games(app_id);
+CREATE INDEX idx_user_games_playtime_forever ON user_games(playtime_forever);
+CREATE INDEX idx_user_games_playtime_2weeks ON user_games(playtime_2weeks);
+
+-- Friends indexes
+CREATE INDEX idx_friends_user_steam_id ON friends(user_steam_id);
+CREATE INDEX idx_friends_friend_steam_id ON friends(friend_steam_id);
 ```
 
 ## Current Data Volume

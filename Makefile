@@ -1,4 +1,4 @@
-.PHONY: help build-docker run-docker stop-docker helm-install helm-uninstall lint format-check format test check clean
+.PHONY: help build-docker run-docker stop-docker helm-install helm-uninstall lint format-check format test test-unit test-integration test-full check check-full clean
 
 # Default target
 help:
@@ -14,7 +14,11 @@ help:
 	@echo "  make format-check    - Check code formatting with black"
 	@echo "  make format          - Format code with black"
 	@echo "  make test            - Run basic import tests"
+	@echo "  make test-unit       - Run comprehensive unit tests"
+	@echo "  make test-integration- Run integration tests (starts server)"
+	@echo "  make test-full       - Run all tests (unit + integration)"
 	@echo "  make check           - Run all code quality checks"
+	@echo "  make check-full      - Run all checks + comprehensive tests"
 
 # Docker targets
 build-docker:
@@ -69,11 +73,25 @@ format:
 	black src
 
 test:
-	@echo "Running tests..."
-	python -c "from src.shared.database import Base, get_db; from src.fetcher.steam_library_fetcher import SteamLibraryFetcher; from src.mcp_server.mcp_server import mcp; print('All imports successful!')"
+	@echo "Running basic import tests..."
+	python -c "from src.shared.database import Base, get_db; from src.fetcher.steam_library_fetcher import SteamLibraryFetcher; from src.mcp_server.server import mcp; print('✅ All basic imports successful!')"
+
+test-unit:
+	@echo "Running comprehensive unit tests..."
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_server.py
+
+test-integration:
+	@echo "Running integration tests (this will start a test server)..."
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_integration.py
+
+test-full: test-unit test-integration
+	@echo "All tests completed!"
 
 check: lint format-check test
 	@echo "All checks passed!"
+
+check-full: lint format-check test-full
+	@echo "All comprehensive checks and tests passed!"
 
 clean:
 	@echo "Cleaning up..."
