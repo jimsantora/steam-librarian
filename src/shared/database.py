@@ -26,10 +26,9 @@ logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
-# Get database path from environment or use default with absolute path
+# Get database URL from environment or construct default
 default_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "steam_library.db")
-DB_PATH = os.environ.get("DB_PATH", os.environ.get("STEAM_LIBRARY_DB", default_db_path))
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{default_db_path}")
 
 # Create engine with performance optimizations
 engine = create_engine(

@@ -7,6 +7,8 @@ import signal
 import sys
 from pathlib import Path
 
+from sqlalchemy import text
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -48,7 +50,7 @@ def validate_environment():
         from shared.database import get_db
 
         with get_db() as session:
-            session.execute("SELECT 1").fetchone()
+            session.execute(text("SELECT 1")).fetchone()
         logger.info("Database connection successful")
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
@@ -90,7 +92,7 @@ async def main():
         logger.info(f"MCP endpoint at: http://{settings.host}:{settings.port}/mcp")
 
         # Run the FastMCP server
-        await mcp.run_streamable_http_async(host=settings.host, port=settings.port)
+        await mcp.run_streamable_http_async()
 
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt, shutting down...")

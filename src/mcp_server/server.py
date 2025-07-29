@@ -4,6 +4,7 @@
 import logging
 
 from mcp.server.fastmcp import FastMCP
+from sqlalchemy import text
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
@@ -14,7 +15,7 @@ logging.basicConfig(level=logging.INFO if settings.debug else logging.WARNING, f
 logger = logging.getLogger(__name__)
 
 # Create the FastMCP server instance for HTTP streaming
-mcp = FastMCP("steam-librarian")
+mcp = FastMCP("steam-librarian", host=settings.host, port=settings.port)
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -22,11 +23,11 @@ async def health_check(request: Request) -> PlainTextResponse:
     """Health check endpoint for liveness/readiness probes"""
     try:
         # Test database connection
-        from ..shared.database import get_db
+        from shared.database import get_db
 
         with get_db() as session:
             # Simple query to test DB connectivity
-            session.execute("SELECT 1").fetchone()
+            session.execute(text("SELECT 1")).fetchone()
 
         # Test cache system
         from .cache import cache
@@ -57,10 +58,10 @@ async def detailed_health_check(request: Request):
 
     # Test database
     try:
-        from ..shared.database import get_db
+        from shared.database import get_db
 
         with get_db() as session:
-            result = session.execute("SELECT COUNT(*) FROM user_profiles").scalar()
+            result = session.execute(text("SELECT COUNT(*) FROM user_profile")).scalar()
             health_data["components"]["database"] = {"status": "healthy", "user_count": result}
     except Exception as e:
         health_data["components"]["database"] = {"status": "unhealthy", "error": str(e)}
@@ -125,11 +126,11 @@ async def get_metrics(request: Request):
 
         # Add database metrics if available
         try:
-            from ..shared.database import get_db
+            from shared.database import get_db
 
             with get_db() as session:
-                user_count = session.execute("SELECT COUNT(*) FROM user_profiles").scalar()
-                game_count = session.execute("SELECT COUNT(*) FROM games").scalar()
+                user_count = session.execute(text("SELECT COUNT(*) FROM user_profile")).scalar()
+                game_count = session.execute(text("SELECT COUNT(*) FROM games")).scalar()
                 metrics_data["database"] = {"users": user_count, "games": game_count}
         except Exception:
             pass
