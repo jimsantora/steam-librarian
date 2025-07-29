@@ -10,7 +10,7 @@ from shared.database import Game, Genre, UserGame, UserProfile, get_db
 logger = logging.getLogger(__name__)
 
 
-async def get_games_by_genre(user: UserProfile, genre_name: str) -> list[dict[str, Any]]:
+def get_games_by_genre(user: UserProfile, genre_name: str) -> list[dict[str, Any]]:
     """Get all games in user's library for a specific genre"""
 
     with get_db() as session:

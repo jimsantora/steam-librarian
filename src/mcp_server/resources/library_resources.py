@@ -43,34 +43,51 @@ async def library_overview() -> str:
 
 
 @mcp.resource("library://games/{app_id}")
-async def game_details(app_id: str) -> str:
+def game_details(app_id: str) -> str:
     """Deep dive into any game - details, reviews, and your personal history"""
-
+    import asyncio
+    
     if not app_id.isdigit():
         error = {"error": True, "error_type": "VALIDATION_ERROR", "message": "Invalid app_id format"}
         return json.dumps(error, indent=2)
 
-    # Resolve user for personal game history
-    user_context = await resolve_user_context()
-    user = user_context.get("user") if "user" in user_context else None
+    async def _get_game_details():
+        # Resolve user for personal game history
+        user_context = await resolve_user_context()
+        user = user_context.get("user") if "user" in user_context else None
 
-    cache_key = game_cache_key("details", app_id)
-    if user:
-        cache_key += f"_{user.steam_id}"
+        cache_key = game_cache_key("details", app_id)
+        if user:
+            cache_key += f"_{user.steam_id}"
 
-    # Try cache first
-    cached_details = await cache.get(cache_key)
-    if cached_details:
-        return cached_details
+        # Try cache first
+        cached_details = await cache.get(cache_key)
+        if cached_details:
+            return cached_details
 
-    # Get fresh details
-    details = get_game_details_with_context(app_id, user)
+        # Get fresh details
+        details = get_game_details_with_context(app_id, user)
 
-    # Cache the result
-    details_json = json.dumps(details, indent=2)
-    await cache.set(cache_key, details_json, ttl=3600)  # 1 hour
+        # Cache the result
+        details_json = json.dumps(details, indent=2)
+        await cache.set(cache_key, details_json, ttl=3600)  # 1 hour
 
-    return details_json
+        return details_json
+    
+    # Get or create event loop and run async function
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're in an async context, need to create a new task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _get_game_details())
+                return future.result()
+        else:
+            return loop.run_until_complete(_get_game_details())
+    except RuntimeError:
+        # No event loop, create one
+        return asyncio.run(_get_game_details())
 
 
 @mcp.resource("library://activity/recent")
@@ -100,31 +117,48 @@ async def recent_activity() -> str:
 
 
 @mcp.resource("library://genres/{genre_name}")
-async def games_by_genre(genre_name: str) -> str:
+def games_by_genre(genre_name: str) -> str:
     """All games in your library for a specific genre"""
+    import asyncio
+    
+    async def _get_games_by_genre():
+        user_context = await resolve_user_context()
+        if "error" in user_context:
+            return json.dumps(user_context, indent=2)
 
-    user_context = await resolve_user_context()
-    if "error" in user_context:
-        return json.dumps(user_context, indent=2)
+        user = user_context["user"]
+        cache_key = f"genre_{genre_name}_{user.steam_id}"
 
-    user = user_context["user"]
-    cache_key = f"genre_{genre_name}_{user.steam_id}"
+        # Try cache first
+        cached_games = await cache.get(cache_key)
+        if cached_games:
+            return cached_games
 
-    # Try cache first
-    cached_games = await cache.get(cache_key)
-    if cached_games:
-        return cached_games
+        # Import here to avoid circular dependency
+        from mcp_server.utils.genre_utils import get_games_by_genre
 
-    # Import here to avoid circular dependency
-    from mcp_server.utils.genre_utils import get_games_by_genre
+        # Get games by genre
+        games = get_games_by_genre(user, genre_name)
 
-    # Get games by genre
-    games = get_games_by_genre(user, genre_name)
+        result = {"genre": genre_name, "user": {"steam_id": user.steam_id, "persona_name": user.persona_name}, "games": games, "count": len(games)}
 
-    result = {"genre": genre_name, "user": {"steam_id": user.steam_id, "persona_name": user.persona_name}, "games": games, "count": len(games)}
+        # Cache the result
+        result_json = json.dumps(result, indent=2)
+        await cache.set(cache_key, result_json, ttl=1800)  # 30 minutes
 
-    # Cache the result
-    result_json = json.dumps(result, indent=2)
-    await cache.set(cache_key, result_json, ttl=1800)  # 30 minutes
-
-    return result_json
+        return result_json
+    
+    # Get or create event loop and run async function
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're in an async context, need to create a new task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _get_games_by_genre())
+                return future.result()
+        else:
+            return loop.run_until_complete(_get_games_by_genre())
+    except RuntimeError:
+        # No event loop, create one
+        return asyncio.run(_get_games_by_genre())

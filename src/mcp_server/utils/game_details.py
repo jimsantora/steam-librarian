@@ -10,7 +10,7 @@ from shared.database import Game, UserGame, UserProfile, get_db
 logger = logging.getLogger(__name__)
 
 
-async def get_game_details_with_context(app_id: str, user: UserProfile | None = None) -> dict[str, Any]:
+def get_game_details_with_context(app_id: str, user: UserProfile | None = None) -> dict[str, Any]:
     """Get comprehensive game details with optional user context"""
 
     with get_db() as session:
