@@ -60,7 +60,7 @@ async def filter_games(user_steam_id: str | None = None, playtime_min: float | N
     preset_desc = ""
     if input_data.preset:
         preset_descriptions = {"comfort_food": "games you know and love (highly rated with good playtime)", "hidden_gems": "games you might have overlooked (positive reviews, minimal playtime)", "quick_session": "games perfect for short play sessions (under 1 hour)", "deep_dive": "games for extended gaming sessions (20+ hours of content)"}
-        preset_desc = f"\n\n🎯 **{input_data.preset.replace('_', ' ').title()} Preset**: {preset_descriptions[input_data.preset]}"
+        preset_desc = f"\n\n**{input_data.preset.replace('_', ' ').title()} Preset**: {preset_descriptions[input_data.preset]}"
 
     games_text = _format_filtered_games(results, input_data.sort_by or "playtime")
 
@@ -174,16 +174,16 @@ def _format_filtered_games(games: list[dict[str, Any]], sort_by: str) -> str:
         # Add genres
         if game["genres"]:
             top_genres = game["genres"][:3]  # Show top 3 genres
-            line += f"\n  🎮 {', '.join(top_genres)}"
+            line += f"\n  Genres: {', '.join(top_genres)}"
 
         # Add review info
         if game["review_data"]:
             review = game["review_data"]
-            line += f"\n  ⭐ {review['summary']} ({review['positive_percentage']}% positive)"
+            line += f"\n  Reviews: {review['summary']} ({review['positive_percentage']}% positive)"
 
         # Add maturity rating if present
         if game["maturity_rating"]:
-            line += f"\n  🔞 {game['maturity_rating']}"
+            line += f"\n  Rating: {game['maturity_rating']}"
 
         game_lines.append(line)
 

@@ -72,33 +72,33 @@ class ServerMonitor:
     def format_health_status(self, health_data: dict[str, Any]) -> str:
         """Format health status for display"""
         if "status" not in health_data:
-            return f"❌ Error: {health_data.get('error', 'Unknown error')}"
+            return f"Error: {health_data.get('error', 'Unknown error')}"
 
         status = health_data["status"]
         if status == "healthy":
-            icon = "✅"
+            icon = "[HEALTHY]"
         elif status == "unhealthy":
-            icon = "❌"
+            icon = "[UNHEALTHY]"
         elif status == "unreachable":
-            icon = "🔌"
+            icon = "[UNREACHABLE]"
         else:
-            icon = "❓"
+            icon = "[UNKNOWN]"
 
         result = f"{icon} Server Status: {status.upper()}"
 
         if "timestamp" in health_data:
-            result += f"\n📅 Timestamp: {health_data['timestamp']}"
+            result += f"\nTimestamp: {health_data['timestamp']}"
 
         if "server" in health_data:
             server = health_data["server"]
-            result += f"\n🖥️  Server: {server.get('name', 'unknown')} v{server.get('version', 'unknown')}"
-            result += f"\n🔢 PID: {server.get('pid', 'unknown')}"
+            result += f"\nServer: {server.get('name', 'unknown')} v{server.get('version', 'unknown')}"
+            result += f"\nPID: {server.get('pid', 'unknown')}"
 
         if "components" in health_data:
-            result += "\n\n📊 Component Status:"
+            result += "\n\nComponent Status:"
             for name, component in health_data["components"].items():
                 comp_status = component.get("status", "unknown")
-                comp_icon = "✅" if comp_status == "healthy" else "❌"
+                comp_icon = "[OK]" if comp_status == "healthy" else "[ERR]"
                 result += f"\n  {comp_icon} {name}: {comp_status}"
 
                 if "error" in component:
@@ -113,69 +113,69 @@ class ServerMonitor:
     def format_metrics(self, metrics_data: dict[str, Any]) -> str:
         """Format metrics for display"""
         if "error" in metrics_data:
-            return f"❌ Error: {metrics_data['error']}"
+            return f"Error: {metrics_data['error']}"
 
-        result = "📊 Server Metrics\n"
-        result += f"⏰ Timestamp: {metrics_data.get('timestamp', 'unknown')}\n"
+        result = "Server Metrics\n"
+        result += f"Timestamp: {metrics_data.get('timestamp', 'unknown')}\n"
 
         if "system" in metrics_data:
             sys_data = metrics_data["system"]
-            result += "\n🖥️  System Resources:\n"
-            result += f"  💻 CPU: {sys_data.get('cpu_percent', 0):.1f}%\n"
-            result += f"  🧠 Memory: {sys_data.get('memory_mb', 0):.1f} MB ({sys_data.get('memory_percent', 0):.1f}%)\n"
-            result += f"  🧵 Threads: {sys_data.get('threads', 0)}\n"
-            result += f"  ⏱️  Uptime: {sys_data.get('uptime_seconds', 0):.0f} seconds\n"
+            result += "\nSystem Resources:\n"
+            result += f"  CPU: {sys_data.get('cpu_percent', 0):.1f}%\n"
+            result += f"  Memory: {sys_data.get('memory_mb', 0):.1f} MB ({sys_data.get('memory_percent', 0):.1f}%)\n"
+            result += f"  Threads: {sys_data.get('threads', 0)}\n"
+            result += f"  Uptime: {sys_data.get('uptime_seconds', 0):.0f} seconds\n"
 
         if "cache" in metrics_data:
             cache_data = metrics_data["cache"]
-            result += "\n💾 Cache:\n"
-            result += f"  📦 Size: {cache_data.get('size', 0)}/{cache_data.get('max_size', 0)}\n"
-            result += f"  🎯 Hit Rate: {cache_data.get('hit_rate', 0):.2f}\n"
+            result += "\nCache:\n"
+            result += f"  Size: {cache_data.get('size', 0)}/{cache_data.get('max_size', 0)}\n"
+            result += f"  Hit Rate: {cache_data.get('hit_rate', 0):.2f}\n"
 
         if "database" in metrics_data:
             db_data = metrics_data["database"]
-            result += "\n🗄️  Database:\n"
-            result += f"  👥 Users: {db_data.get('users', 0)}\n"
-            result += f"  🎮 Games: {db_data.get('games', 0)}\n"
+            result += "\nDatabase:\n"
+            result += f"  Users: {db_data.get('users', 0)}\n"
+            result += f"  Games: {db_data.get('games', 0)}\n"
 
         return result
 
     def format_config(self, config_data: dict[str, Any]) -> str:
         """Format configuration for display"""
         if "error" in config_data:
-            return f"❌ Error: {config_data['error']}"
+            return f"Error: {config_data['error']}"
 
-        result = "⚙️  Server Configuration\n"
+        result = "Server Configuration\n"
 
         if "server_info" in config_data:
             server = config_data["server_info"]
-            result += "\n🖥️  Server Info:\n"
-            result += f"  📛 Name: {server.get('name', 'unknown')}\n"
-            result += f"  🏷️  Version: {server.get('version', 'unknown')}\n"
-            result += f"  🌐 Host: {server.get('host', 'unknown')}:{server.get('port', 'unknown')}\n"
-            result += f"  🐛 Debug: {server.get('debug', False)}\n"
-            result += f"  📝 Log Level: {server.get('log_level', 'unknown')}\n"
+            result += "\nServer Info:\n"
+            result += f"  Name: {server.get('name', 'unknown')}\n"
+            result += f"  Version: {server.get('version', 'unknown')}\n"
+            result += f"  Host: {server.get('host', 'unknown')}:{server.get('port', 'unknown')}\n"
+            result += f"  Debug: {server.get('debug', False)}\n"
+            result += f"  Log Level: {server.get('log_level', 'unknown')}\n"
 
         if "features" in config_data:
-            result += "\n🎛️  Feature Flags:\n"
+            result += "\nFeature Flags:\n"
             for feature, enabled in config_data["features"].items():
-                icon = "✅" if enabled else "❌"
+                icon = "[ON]" if enabled else "[OFF]"
                 result += f"  {icon} {feature}\n"
 
         if "validation" in config_data:
             validation = config_data["validation"]
-            result += "\n✅ Configuration Validation:\n"
-            result += f"  Valid: {'✅' if validation.get('valid', False) else '❌'}\n"
+            result += "\nConfiguration Validation:\n"
+            result += f"  Valid: {'[YES]' if validation.get('valid', False) else '[NO]'}\n"
 
             if validation.get("warnings"):
                 result += "  Warnings:\n"
                 for warning in validation["warnings"]:
-                    result += f"    ⚠️  {warning}\n"
+                    result += f"    WARNING: {warning}\n"
 
             if validation.get("errors"):
                 result += "  Errors:\n"
                 for error in validation["errors"]:
-                    result += f"    ❌ {error}\n"
+                    result += f"    ERROR: {error}\n"
 
         return result
 
@@ -227,7 +227,7 @@ async def main():
         print(monitor.format_metrics(metrics_data))  # noqa: T201
 
     elif args.command == "status":
-        print("🔍 Fetching complete server status...\n")  # noqa: T201
+        print("Fetching complete server status...\n")  # noqa: T201
 
         health_data = await monitor.check_health(detailed=True)
         print(monitor.format_health_status(health_data))  # noqa: T201
@@ -241,7 +241,7 @@ async def main():
         print(monitor.format_config(config_data))  # noqa: T201
 
     elif args.command == "monitor":
-        print(f"🔄 Starting continuous monitoring (interval: {args.interval}s)")  # noqa: T201
+        print(f"Starting continuous monitoring (interval: {args.interval}s)")  # noqa: T201
         print("Press Ctrl+C to stop\n")  # noqa: T201
 
         try:
@@ -253,7 +253,7 @@ async def main():
                     output = {"timestamp": datetime.now().isoformat(), "health": health_data, "metrics": metrics_data}
                     print(json.dumps(output, indent=2))  # noqa: T201
                 else:
-                    print(f"📊 Monitor Update - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")  # noqa: T201
+                    print(f"Monitor Update - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")  # noqa: T201
 
                     health_data = await monitor.check_health()
                     print(monitor.format_health_status(health_data))  # noqa: T201
@@ -263,7 +263,7 @@ async def main():
                 await asyncio.sleep(args.interval)
 
         except KeyboardInterrupt:
-            print("\n🛑 Monitoring stopped")  # noqa: T201
+            print("\nMonitoring stopped")  # noqa: T201
 
 
 if __name__ == "__main__":

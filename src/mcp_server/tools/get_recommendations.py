@@ -375,23 +375,23 @@ def _format_recommendations(recommendations: list[dict[str, Any]]) -> str:
 
     for _i, rec in enumerate(recommendations, 1):
         # Basic info with score indicator
-        confidence = "🔥" if rec["score"] > 0.8 else "⭐" if rec["score"] > 0.6 else "💡"
+        confidence = "[HIGH]" if rec["score"] > 0.8 else "[MED]" if rec["score"] > 0.6 else "[LOW]"
         line = f"{confidence} **{rec['name']}**"
 
         # Add genres
         if rec["genres"]:
             top_genres = rec["genres"][:2]
-            line += f"\n  🎮 {', '.join(top_genres)}"
+            line += f"\n  Genres: {', '.join(top_genres)}"
 
         # Add review info
         if rec["review_data"]:
             review = rec["review_data"]
-            line += f"\n  ⭐ {review['summary']} ({review['positive_percentage']}% positive)"
+            line += f"\n  Reviews: {review['summary']} ({review['positive_percentage']}% positive)"
 
         # Add reasons
         if rec["reasons"]:
             reasons_text = " • ".join(rec["reasons"])
-            line += f"\n  💭 {reasons_text}"
+            line += f"\n  Reasons: {reasons_text}"
 
         rec_lines.append(line)
 

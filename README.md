@@ -18,26 +18,26 @@
 
 A powerful Model Context Protocol (MCP) server that provides intelligent access to your Steam library data through natural language processing, personalized recommendations, and advanced gaming analytics. Built with FastMCP and featuring HTTP streaming, smart caching, and comprehensive testing.
 
-**🎮 Your Intelligent Gaming Companion** - Search games with natural language ("chill puzzle games for tonight"), get AI-powered personalized recommendations, analyze your gaming patterns with detailed insights, and discover social gaming opportunities with friends through compatibility scoring.
+**Your Intelligent Gaming Companion** - Search games with natural language ("chill puzzle games for tonight"), get AI-powered personalized recommendations, analyze your gaming patterns with detailed insights, and discover social gaming opportunities with friends through compatibility scoring.
 
 This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built as a learning experience and comprehensive example of creating a production-ready MCP server. 
 
 ## Features
 
-### 🧠 Intelligent Gaming Tools
+### Intelligent Gaming Tools
 - **Natural Language Search**: Find games using natural queries like "chill puzzle games for tonight" or "games like Portal"
 - **AI-Powered Recommendations**: Get personalized suggestions based on your gaming patterns, mood, and available time
 - **Smart Filtering**: Use intelligent presets (comfort_food, hidden_gems, quick_session, deep_dive) or custom criteria
 - **Social Gaming Analytics**: Discover friends' libraries, find common games, and calculate compatibility scores
 - **Comprehensive Library Insights**: Deep analytics with AI-generated gaming insights and trend analysis
 
-### 📊 Core Functionality
+### Core Functionality
 - **Multi-User Support**: Query multiple Steam users and seamlessly switch between libraries
 - **Game Details & Reviews**: Comprehensive information including review statistics and ratings
 - **Recent Activity Tracking**: Monitor what you and your friends have been playing
 - **User Profile Data**: Access Steam levels, XP, account age, and profile information
 
-### 🔧 Technical Excellence
+### Technical Excellence
 - **Production-Ready Architecture**: Built with FastMCP, HTTP streaming, and comprehensive error handling
 - **Smart Caching System**: Intelligent caching with configurable TTL for optimal performance
 - **Comprehensive Testing**: Full unit and integration test coverage with quality assurance
@@ -137,29 +137,29 @@ The server uses context understanding and AI-powered analysis to provide intelli
 
 The server provides 5 comprehensive tools that leverage natural language processing and AI:
 
-### 🔍 **search_games** - Natural Language Game Search
+### **search_games** - Natural Language Game Search
 - **Natural Language Processing**: Understands queries like "chill puzzle games" or "games like Portal"
 - **Mood Detection**: Recognizes gaming moods (chill, intense, creative, social, nostalgic)
 - **Context Awareness**: Handles time constraints ("quick games") and playtime preferences
 - **Smart Matching**: Finds similar games and handles partial/fuzzy matching
 
-### 🎯 **filter_games** - Advanced Filtering with Intelligent Presets  
+### **filter_games** - Advanced Filtering with Intelligent Presets  
 - **Smart Presets**: `comfort_food` (highly-rated 5+ hour games), `hidden_gems` (positive <2 hour games)
 - **Custom Filtering**: Playtime ranges, review ratings, categories, maturity ratings
 - **Intelligent Sorting**: Multiple sort options with relevance scoring
 
-### 🎮 **get_recommendations** - AI-Powered Personalized Recommendations
+### **get_recommendations** - AI-Powered Personalized Recommendations
 - **Context-Aware**: Considers mood, available time, and gaming preferences
 - **Algorithmic Intelligence**: Genre preferences, developer affinity, playtime patterns
 - **Personalization**: Adapts to your unique gaming history and preferences
 
-### 👥 **get_friends_data** - Social Gaming Analytics
+### **get_friends_data** - Social Gaming Analytics
 - **Common Games Discovery**: Find games you share with friends
 - **Compatibility Scoring**: AI-powered compatibility analysis based on genres and games
 - **Activity Tracking**: Monitor friends' recent gaming activity
 - **Multiplayer Matching**: Find friends who own specific multiplayer games
 
-### 📊 **get_library_stats** - Comprehensive Library Analytics
+### **get_library_stats** - Comprehensive Library Analytics
 - **Deep Analytics**: Playtime distribution, genre preferences, developer loyalty
 - **AI-Generated Insights**: Smart observations about your gaming patterns
 - **Trend Analysis**: Activity patterns and gaming behavior over time
@@ -328,14 +328,14 @@ make check-full
 
 The server exposes these intelligent tools through the MCP protocol:
 
-**🧠 Advanced Intelligence Tools:**
+**Advanced Intelligence Tools:**
 - `search_games` - Natural language search with mood detection and context understanding
 - `filter_games` - Smart filtering with intelligent presets and custom criteria  
 - `get_recommendations` - AI-powered personalized recommendations with context awareness
 - `get_friends_data` - Social gaming analytics with compatibility scoring
 - `get_library_stats` - Comprehensive library insights with AI-generated analysis
 
-**📊 Utility Tools:**
+**Utility Tools:**
 - `get_all_users` - List all Steam users in the database
 - `get_user_info` - Get comprehensive user profile information  
 - `get_game_details` - Get detailed information about specific games

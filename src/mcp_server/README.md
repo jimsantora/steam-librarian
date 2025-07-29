@@ -60,7 +60,7 @@ src/mcp_server/
 
 ## Features
 
-### 🎮 Advanced Gaming Tools
+### Advanced Gaming Tools
 
 1. **Natural Language Search** - Search games using natural language queries
 2. **Smart Filtering** - Filter games with intelligent presets and custom criteria
@@ -68,7 +68,7 @@ src/mcp_server/
 4. **Social Gaming** - Analyze friends' libraries and find common games
 5. **Library Analytics** - Comprehensive statistics and insights about your gaming habits
 
-### 🔧 Technical Features
+### Technical Features
 
 - **FastMCP Framework** - HTTP streaming protocol for better performance
 - **Multi-user Context** - Automatic user resolution with intelligent fallbacks
@@ -450,70 +450,70 @@ make check-full
 ### Test Coverage
 
 #### Unit Tests (52 test cases)
-- ✅ **Import Testing**: All critical modules and tools
-- ✅ **Configuration Management**: Server info, feature flags, validation
-- ✅ **FastMCP Integration**: Server instance, tool registration, metadata
-- ✅ **Database Models**: Connection, model attributes, relationships
-- ✅ **Caching System**: Set/get operations, cache invalidation, get_or_compute
-- ✅ **User Context Resolution**: Graceful handling of missing data
-- ✅ **Input Validation**: All Pydantic schemas with proper error handling
-- ✅ **Error Framework**: Decorator functionality and error classes
-- ✅ **Monitoring Tools**: Script existence and executability
+- **Import Testing**: All critical modules and tools
+- **Configuration Management**: Server info, feature flags, validation
+- **FastMCP Integration**: Server instance, tool registration, metadata
+- **Database Models**: Connection, model attributes, relationships
+- **Caching System**: Set/get operations, cache invalidation, get_or_compute
+- **User Context Resolution**: Graceful handling of missing data
+- **Input Validation**: All Pydantic schemas with proper error handling
+- **Error Framework**: Decorator functionality and error classes
+- **Monitoring Tools**: Script existence and executability
 
 #### Integration Tests
-- ✅ **Server Startup**: Production server launch and health checks
-- ✅ **Health Endpoints**: Basic and detailed health monitoring
-- ✅ **MCP Protocol**: Basic connectivity and protocol compliance
+- **Server Startup**: Production server launch and health checks
+- **Health Endpoints**: Basic and detailed health monitoring
+- **MCP Protocol**: Basic connectivity and protocol compliance
 
 #### Tool Testing
 All 5 MCP tools are validated for proper registration and functionality:
-1. ✅ **search_games** - Natural language game search
-2. ✅ **filter_games** - Advanced filtering with presets
-3. ✅ **get_recommendations** - Personalized recommendations
-4. ✅ **get_friends_data** - Social gaming features
-5. ✅ **get_library_stats** - Comprehensive analytics
+1. **search_games** - Natural language game search
+2. **filter_games** - Advanced filtering with presets
+3. **get_recommendations** - Personalized recommendations
+4. **get_friends_data** - Social gaming features
+5. **get_library_stats** - Comprehensive analytics
 
 ### Test Environment Setup
 
 Tests are designed to work in any environment, including:
-- ✅ **Empty databases** (graceful handling of missing data)
-- ✅ **Missing dependencies** (`aiohttp` optional for integration tests)
-- ✅ **CI/CD environments** (no external dependencies required)
+- **Empty databases** (graceful handling of missing data)
+- **Missing dependencies** (`aiohttp` optional for integration tests)
+- **CI/CD environments** (no external dependencies required)
 
 ### Test Results Format
 
-Unit tests provide detailed output with emojis and progress tracking:
+Unit tests provide detailed output and progress tracking:
 ```
-🧪 Steam Librarian MCP Server Test Suite
+Steam Librarian MCP Server Test Suite
 ==================================================
 
-🔍 Testing Imports...
-✅ Import mcp_server.server
-✅ Import mcp_server.config
+Testing Imports...
+✓ Import mcp_server.server
+✓ Import mcp_server.config
 ...
 
-📊 Test Results Summary
-✅ Passed: 52
-❌ Failed: 0
-📈 Success Rate: 100.0%
+Test Results Summary
+✓ Passed: 52
+✗ Failed: 0
+Success Rate: 100.0%
 
-🎉 All tests passed! The MCP Server is ready for production.
+All tests passed! The MCP Server is ready for production.
 ```
 
 Integration tests show server startup and endpoint testing:
 ```
-🔗 Steam Librarian MCP Server Integration Tests
+Steam Librarian MCP Server Integration Tests
 ==================================================
-🚀 Starting test server...
-✅ Test server started successfully
+Starting test server...
+✓ Test server started successfully
 
-🏥 Testing Health Endpoints...
-✅ Basic health check
-✅ Detailed health check
+Testing Health Endpoints...
+✓ Basic health check
+✓ Detailed health check
 ...
 
-📊 Integration Test Results: 2/2 passed
-🎉 All integration tests passed!
+Integration Test Results: 2/2 passed
+All integration tests passed!
 ```
 
 ### Continuous Integration
@@ -761,7 +761,7 @@ PYTHONPATH=src python tests/test_mcp_server.py
 
 #### Integration Test Server Startup Fails
 ```
-❌ Test server failed to start within timeout
+Test server failed to start within timeout
 ```
 **Solution:** Check if the port is already in use or increase timeout:
 ```bash
@@ -774,7 +774,7 @@ PORT=8002 make test-integration
 
 #### Missing aiohttp Dependency
 ```
-⚠️ aiohttp not available - integration tests will be limited
+aiohttp not available - integration tests will be limited
 ```
 **Solution:** Install aiohttp for full integration testing:
 ```bash

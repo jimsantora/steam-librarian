@@ -278,7 +278,7 @@ def _format_search_results(results: list[dict[str, Any]]) -> str:
 
     for game in results:
         # Basic info with confidence indicator
-        confidence = "🔥" if game["score"] > 0.8 else "⭐" if game["score"] > 0.5 else "💡"
+        confidence = "[HIGH]" if game["score"] > 0.8 else "[MED]" if game["score"] > 0.5 else "[LOW]"
         line = f"{confidence} **{game['name']}** ({game['playtime_hours']}h played"
 
         # Recent activity indicator
@@ -290,23 +290,23 @@ def _format_search_results(results: list[dict[str, Any]]) -> str:
         # Add genres
         if game["genres"]:
             top_genres = game["genres"][:3]
-            line += f"\n  🎮 {', '.join(top_genres)}"
+            line += f"\n  Genres: {', '.join(top_genres)}"
 
         # Add match reasons
         if game["match_reasons"]:
             reasons_text = " • ".join(game["match_reasons"])
-            line += f"\n  💭 {reasons_text}"
+            line += f"\n  Reasons: {reasons_text}"
 
         # Add review info if available
         if game["review_data"]:
             review = game["review_data"]
-            line += f"\n  ⭐ {review['summary']} ({review['positive_percentage']}% positive)"
+            line += f"\n  Reviews: {review['summary']} ({review['positive_percentage']}% positive)"
 
         result_lines.append(line)
 
     result = "\n\n".join(result_lines)
 
     if len(results) == 15:
-        result += "\n\n💡 *Showing top 15 results. Try more specific terms to narrow down.*"
+        result += "\n\n*Showing top 15 results. Try more specific terms to narrow down.*"
 
     return result

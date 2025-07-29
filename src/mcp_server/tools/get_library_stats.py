@@ -376,7 +376,7 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
     sections = []
 
     # Basic overview
-    overview_text = f"""📊 **Overview**
+    overview_text = f"""**Overview**
 • Total Games: {stats['total_games']}
 • Games Played: {stats['played_games']} ({round((stats['played_games']/stats['total_games'])*100, 1)}%)
 • Total Playtime: {stats['total_playtime_hours']} hours
@@ -389,7 +389,7 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
         for genre, data in list(stats["genres"].items())[:5]:
             genre_lines.append(f"  • {genre}: {data['count']} games, {data['playtime_hours']}h")
 
-        genres_text = f"""🎮 **Top Genres**
+        genres_text = f"""**Top Genres**
 {chr(10).join(genre_lines)}"""
         sections.append(genres_text)
 
@@ -399,7 +399,7 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
         for dev in stats["developer_stats"]["top_by_playtime"][:3]:
             dev_lines.append(f"  • {dev['name']}: {dev['games_count']} games, {dev['playtime_hours']}h")
 
-        dev_text = f"""👥 **Favorite Developers**
+        dev_text = f"""**Favorite Developers**
 {chr(10).join(dev_lines)}"""
         sections.append(dev_text)
 
@@ -408,20 +408,20 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
         dist = stats["playtime_distribution"]["distribution"]
         most_played = stats["playtime_distribution"]["most_played_game"]
 
-        dist_text = f"""⏱️ **Playtime Distribution**
+        dist_text = f"""**Playtime Distribution**
 • Under 1h: {dist['under_1h']['count']} games ({dist['under_1h']['percentage']}%)
 • 1-5h: {dist['1_5h']['count']} games ({dist['1_5h']['percentage']}%)
 • 5-20h: {dist['5_20h']['count']} games ({dist['5_20h']['percentage']}%)
 • 20-100h: {dist['20_100h']['count']} games ({dist['20_100h']['percentage']}%)
 • 100h+: {dist['over_100h']['count']} games ({dist['over_100h']['percentage']}%)
 
-🏆 Most Played: **{most_played['name']}** ({most_played['playtime_hours']}h)"""
+Most Played: **{most_played['name']}** ({most_played['playtime_hours']}h)"""
         sections.append(dist_text)
 
     # Recent activity
     if stats.get("recent_activity"):
         activity = stats["recent_activity"]
-        recent_text = f"""🚀 **Recent Activity**
+        recent_text = f"""**Recent Activity**
 • Last 2 weeks: {activity['last_2_weeks']} hours
 • Active games: {activity['active_games']}"""
         sections.append(recent_text)
@@ -430,7 +430,7 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
     if stats.get("activity_trends"):
         trends = stats["activity_trends"]
         if isinstance(trends, dict) and "activity_level" in trends:
-            trends_text = f"""📈 **Activity Trends**
+            trends_text = f"""**Activity Trends**
 • Activity Level: {trends['activity_level']}
 • Recent Hours: {trends['recent_hours']}h
 • Recent Games: {trends['recent_games_count']}
@@ -445,7 +445,7 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
         for pref in review_prefs["preferred_review_types"]:
             pref_lines.append(f"  • {pref['type']}: {pref['preference_percentage']}%")
 
-        review_text = f"""⭐ **Review Preferences**
+        review_text = f"""**Review Preferences**
 {chr(10).join(pref_lines)}
 • Average Rating: {review_prefs['average_rating_preference']}%"""
         sections.append(review_text)
@@ -456,7 +456,7 @@ def _format_library_stats(stats: dict[str, Any], time_period: str, include_insig
         for insight in stats["insights"]:
             insights_lines.append(f"• {insight}")
 
-        insights_text = f"""💡 **Gaming Insights**
+        insights_text = f"""**Gaming Insights**
 {chr(10).join(insights_lines)}"""
         sections.append(insights_text)
 

@@ -377,15 +377,15 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
             recommendations = data["recommendations"]
 
             result = f"**Common Games with {friend['persona_name']}**\n\n"
-            result += f"🎮 **{total_common} games in common**\n\n"
+            result += f"**{total_common} games in common**\n\n"
 
             if common_games:
                 game_lines = []
                 for game in common_games[:10]:  # Top 10
-                    multiplayer_icon = "👥" if game["is_multiplayer"] else "👤"
-                    recent_icon = "🔥" if game["recently_active"] else ""
+                    multiplayer_prefix = "[MP]" if game["is_multiplayer"] else "[SP]"
+                    recent_prefix = "[ACTIVE]" if game["recently_active"] else ""
 
-                    line = f"{multiplayer_icon}{recent_icon} **{game['name']}**"
+                    line = f"{multiplayer_prefix}{recent_prefix} **{game['name']}**"
                     line += f"\n  • You: {game['your_playtime_hours']}h | {friend['persona_name']}: {game['friend_playtime_hours']}h"
 
                     if game["genres"]:
@@ -396,7 +396,7 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
                 result += "\n\n".join(game_lines)
 
             if recommendations:
-                result += f"\n\n🌟 **Games {friend['persona_name']} recommends:**\n"
+                result += f"\n\n**Games {friend['persona_name']} recommends:**\n"
                 rec_lines = []
                 for rec in recommendations:
                     rec_lines.append(f"• **{rec['name']}** ({rec['friend_playtime_hours']}h played, {rec['review_score']}% positive)")
@@ -415,9 +415,9 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
                 friend_lines = []
                 for friend_data in friends_comparison[:10]:  # Top 10
                     friend = friend_data["friend"]
-                    score_icon = "🔥" if friend_data["compatibility_score"] > 50 else "⭐" if friend_data["compatibility_score"] > 25 else "💡"
+                    score_label = "[HIGH]" if friend_data["compatibility_score"] > 50 else "[MED]" if friend_data["compatibility_score"] > 25 else "[LOW]"
 
-                    line = f"{score_icon} **{friend['persona_name']}**"
+                    line = f"{score_label} **{friend['persona_name']}**"
                     line += f"\n  • {friend_data['common_games_count']} common games ({friend_data['compatibility_score']}% compatible)"
                     line += f"\n  • Total library: {friend_data['total_friend_games']} games"
 
@@ -437,9 +437,9 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
             activity_lines = []
             for friend_data in active_friends:
                 friend = friend_data["friend"]
-                activity_icon = "🔥" if friend_data["recent_hours"] > 10 else "⭐" if friend_data["recent_hours"] > 5 else "💡"
+                activity_label = "[HIGH]" if friend_data["recent_hours"] > 10 else "[MED]" if friend_data["recent_hours"] > 5 else "[LOW]"
 
-                line = f"{activity_icon} **{friend['persona_name']}**"
+                line = f"{activity_label} **{friend['persona_name']}**"
                 line += f"\n  • {friend_data['recent_hours']}h in last 2 weeks ({friend_data['recent_games_count']} games)"
                 line += f"\n  • Currently playing: {friend_data['most_played_recent']['name']} ({friend_data['most_played_recent']['hours']}h recent)"
                 line += f"\n  • Favorite genre: {friend_data['top_recent_genre']}"
@@ -460,15 +460,15 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
         result = f"**Multiplayer Compatibility: {game_info['name']}**\n\n"
         result += f"{multiplayer_status}\n"
         result += f"Your playtime: {data['your_playtime_hours']}h\n\n"
-        result += f"🎮 **{total_compatible} friends own this game:**\n\n"
+        result += f"**{total_compatible} friends own this game:**\n\n"
 
         if compatible_friends:
             friend_lines = []
             for friend_data in compatible_friends:
                 friend = friend_data["friend"]
-                activity_icon = "🔥" if friend_data["is_active"] else "💤"
+                activity_status = "[ACTIVE]" if friend_data["is_active"] else "[INACTIVE]"
 
-                line = f"{activity_icon} **{friend['persona_name']}**"
+                line = f"{activity_status} **{friend['persona_name']}**"
                 line += f"\n  • {friend_data['playtime_hours']}h total"
 
                 if friend_data["recent_playtime_hours"] > 0:
@@ -492,19 +492,19 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
                 score = score_data["compatibility_score"]
 
                 if score > 70:
-                    compatibility_icon = "🔥"
+                    compatibility_label = "[EXCELLENT]"
                     compatibility_desc = "Excellent match"
                 elif score > 50:
-                    compatibility_icon = "⭐"
+                    compatibility_label = "[GOOD]"
                     compatibility_desc = "Good compatibility"
                 elif score > 30:
-                    compatibility_icon = "💡"
+                    compatibility_label = "[SOME]"
                     compatibility_desc = "Some shared interests"
                 else:
-                    compatibility_icon = "🤔"
+                    compatibility_label = "[DIFFERENT]"
                     compatibility_desc = "Different gaming styles"
 
-                line = f"{compatibility_icon} **{friend['persona_name']}** ({score}% compatible)"
+                line = f"{compatibility_label} **{friend['persona_name']}** ({score}% compatible)"
                 line += f"\n  • {compatibility_desc}"
                 line += f"\n  • {score_data['common_games']} games in common"
                 line += f"\n  • Genre similarity: {score_data['genre_similarity']}%"
