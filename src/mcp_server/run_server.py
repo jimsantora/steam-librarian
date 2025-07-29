@@ -16,6 +16,7 @@ from mcp_server.server import mcp
 
 def setup_signal_handlers():
     """Setup graceful shutdown handlers"""
+
     def signal_handler(signum, frame):
         logging.info(f"Received signal {signum}, shutting down gracefully...")
         sys.exit(0)
@@ -45,6 +46,7 @@ def validate_environment():
     # Check database accessibility
     try:
         from shared.database import get_db
+
         with get_db() as session:
             session.execute("SELECT 1").fetchone()
         logger.info("Database connection successful")
@@ -88,10 +90,7 @@ async def main():
         logger.info(f"MCP endpoint at: http://{settings.host}:{settings.port}/mcp")
 
         # Run the FastMCP server
-        await mcp.run_streamable_http_async(
-            host=settings.host,
-            port=settings.port
-        )
+        await mcp.run_streamable_http_async(host=settings.host, port=settings.port)
 
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt, shutting down...")

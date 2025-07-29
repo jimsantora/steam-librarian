@@ -100,71 +100,28 @@ class ConfigManager:
         level = getattr(logging, self._settings.log_level)
 
         # Configure root logger
-        logging.basicConfig(
-            level=level,
-            format=self._settings.log_format,
-            filename=self._settings.log_file,
-            filemode='a' if self._settings.log_file else None
-        )
+        logging.basicConfig(level=level, format=self._settings.log_format, filename=self._settings.log_file, filemode="a" if self._settings.log_file else None)
 
         # Set specific loggers
-        logging.getLogger("sqlalchemy.engine").setLevel(
-            logging.INFO if self._settings.database_echo else logging.WARNING
-        )
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO if self._settings.database_echo else logging.WARNING)
 
         self._logger.info(f"Logging configured - Level: {self._settings.log_level}")
 
     def get_performance_config(self) -> dict[str, Any]:
         """Get performance-related configuration"""
-        return {
-            "max_search_results": self._settings.max_search_results,
-            "max_recommendations": self._settings.max_recommendations,
-            "max_concurrent_requests": self._settings.max_concurrent_requests,
-            "request_timeout": self._settings.request_timeout,
-            "database_pool_size": self._settings.database_pool_size,
-            "cache_settings": {
-                "enabled": self._settings.enable_cache,
-                "max_size": self._settings.cache_max_size,
-                "default_ttl": self._settings.cache_ttl,
-                "search_ttl": self._settings.cache_ttl_search,
-                "user_ttl": self._settings.cache_ttl_user,
-                "recommendations_ttl": self._settings.cache_ttl_recommendations,
-                "stats_ttl": self._settings.cache_ttl_stats
-            }
-        }
+        return {"max_search_results": self._settings.max_search_results, "max_recommendations": self._settings.max_recommendations, "max_concurrent_requests": self._settings.max_concurrent_requests, "request_timeout": self._settings.request_timeout, "database_pool_size": self._settings.database_pool_size, "cache_settings": {"enabled": self._settings.enable_cache, "max_size": self._settings.cache_max_size, "default_ttl": self._settings.cache_ttl, "search_ttl": self._settings.cache_ttl_search, "user_ttl": self._settings.cache_ttl_user, "recommendations_ttl": self._settings.cache_ttl_recommendations, "stats_ttl": self._settings.cache_ttl_stats}}
 
     def get_feature_flags(self) -> dict[str, bool]:
         """Get current feature flags"""
-        return {
-            "natural_language_search": self._settings.enable_natural_language_search,
-            "recommendations": self._settings.enable_recommendations,
-            "friends_data": self._settings.enable_friends_data,
-            "caching": self._settings.enable_cache,
-            "detailed_health": self._settings.enable_detailed_health,
-            "social_features": self._settings.enable_social_features,
-            "ml_recommendations": self._settings.enable_ml_recommendations
-        }
+        return {"natural_language_search": self._settings.enable_natural_language_search, "recommendations": self._settings.enable_recommendations, "friends_data": self._settings.enable_friends_data, "caching": self._settings.enable_cache, "detailed_health": self._settings.enable_detailed_health, "social_features": self._settings.enable_social_features, "ml_recommendations": self._settings.enable_ml_recommendations}
 
     def get_server_info(self) -> dict[str, Any]:
         """Get server information"""
-        return {
-            "name": "steam-librarian",
-            "version": "2.0.0",
-            "debug": self._settings.debug,
-            "host": self._settings.host,
-            "port": self._settings.port,
-            "workers": self._settings.workers,
-            "database_url": self._settings.database_url.split('://', 1)[0] + "://***",  # Hide credentials
-            "log_level": self._settings.log_level
-        }
+        return {"name": "steam-librarian", "version": "2.0.0", "debug": self._settings.debug, "host": self._settings.host, "port": self._settings.port, "workers": self._settings.workers, "database_url": self._settings.database_url.split("://", 1)[0] + "://***", "log_level": self._settings.log_level}  # Hide credentials
 
     def validate_configuration(self) -> dict[str, Any]:
         """Validate current configuration and return status"""
-        validation_results = {
-            "valid": True,
-            "warnings": [],
-            "errors": []
-        }
+        validation_results = {"valid": True, "warnings": [], "errors": []}
 
         # Check database URL
         if "sqlite://" not in self._settings.database_url and "postgresql://" not in self._settings.database_url:

@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.orm import joinedload
 
 from mcp_server.cache import cache, user_cache_key
+from mcp_server.server import mcp
 from mcp_server.user_context import resolve_user_context
 from mcp_server.utils.library_stats import calculate_library_overview
 from mcp_server.validation import LibraryStatsInput
@@ -14,17 +15,11 @@ from shared.database import Game, UserGame, UserProfile, get_db
 
 logger = logging.getLogger(__name__)
 
-from mcp_server.server import mcp
-
 
 @mcp.tool()
-async def get_library_stats(
-    user_steam_id: str | None = None,
-    time_period: str = "all_time",
-    include_insights: bool = True
-) -> str:
+async def get_library_stats(user_steam_id: str | None = None, time_period: str = "all_time", include_insights: bool = True) -> str:
     """Get comprehensive library statistics and insights for a user.
-    
+
     Args:
         user_steam_id: Steam ID of user (optional, will auto-resolve if not provided)
         time_period: Time period for analysis - 'all_time', 'last_year', 'last_6_months', 'last_month', 'last_week'
@@ -33,11 +28,7 @@ async def get_library_stats(
 
     # Validate input
     try:
-        input_data = LibraryStatsInput(
-            user_steam_id=user_steam_id,
-            time_period=time_period,
-            include_insights=include_insights
-        )
+        input_data = LibraryStatsInput(user_steam_id=user_steam_id, time_period=time_period, include_insights=include_insights)
     except Exception as e:
         return f"Invalid input: {str(e)}"
 
@@ -80,10 +71,7 @@ async def _generate_comprehensive_stats(user: UserProfile, time_period: str, inc
         enhanced_stats = await _calculate_enhanced_analytics(session, user, time_period)
 
         # Combine basic overview with enhanced analytics
-        stats = {
-            **overview,
-            **enhanced_stats
-        }
+        stats = {**overview, **enhanced_stats}
 
         # Add insights if requested
         if include_insights:
@@ -96,13 +84,7 @@ async def _calculate_enhanced_analytics(session, user: UserProfile, time_period:
     """Calculate enhanced analytics beyond basic overview"""
 
     # Get user games with all relationships
-    user_games = session.query(UserGame).options(
-        joinedload(UserGame.game).joinedload(Game.genres),
-        joinedload(UserGame.game).joinedload(Game.categories),
-        joinedload(UserGame.game).joinedload(Game.developers),
-        joinedload(UserGame.game).joinedload(Game.publishers),
-        joinedload(UserGame.game).joinedload(Game.reviews)
-    ).filter(UserGame.steam_id == user.steam_id).all()
+    user_games = session.query(UserGame).options(joinedload(UserGame.game).joinedload(Game.genres), joinedload(UserGame.game).joinedload(Game.categories), joinedload(UserGame.game).joinedload(Game.developers), joinedload(UserGame.game).joinedload(Game.publishers), joinedload(UserGame.game).joinedload(Game.reviews)).filter(UserGame.steam_id == user.steam_id).all()
 
     played_games = [ug for ug in user_games if ug.playtime_forever > 0]
 
@@ -130,15 +112,7 @@ async def _calculate_enhanced_analytics(session, user: UserProfile, time_period:
     # Recent activity trends (if applicable)
     activity_trends = _analyze_activity_trends(played_games, time_period)
 
-    return {
-        "developer_stats": developer_stats,
-        "publisher_stats": publisher_stats,
-        "playtime_distribution": playtime_distribution,
-        "value_analysis": value_analysis,
-        "review_preferences": review_preferences,
-        "feature_preferences": feature_preferences,
-        "activity_trends": activity_trends
-    }
+    return {"developer_stats": developer_stats, "publisher_stats": publisher_stats, "playtime_distribution": playtime_distribution, "value_analysis": value_analysis, "review_preferences": review_preferences, "feature_preferences": feature_preferences, "activity_trends": activity_trends}
 
 
 def _analyze_developers(played_games: list) -> dict[str, Any]:
@@ -156,16 +130,9 @@ def _analyze_developers(played_games: list) -> dict[str, Any]:
     # Top developers by playtime
     top_by_playtime = []
     for dev, total_time in developer_playtime.most_common(5):
-        top_by_playtime.append({
-            "name": dev,
-            "playtime_hours": round(total_time / 60, 1),
-            "games_count": developer_count[dev]
-        })
+        top_by_playtime.append({"name": dev, "playtime_hours": round(total_time / 60, 1), "games_count": developer_count[dev]})
 
-    return {
-        "top_by_playtime": top_by_playtime,
-        "total_developers": len(developer_count)
-    }
+    return {"top_by_playtime": top_by_playtime, "total_developers": len(developer_count)}
 
 
 def _analyze_publishers(played_games: list) -> dict[str, Any]:
@@ -183,28 +150,15 @@ def _analyze_publishers(played_games: list) -> dict[str, Any]:
     # Top publishers by playtime
     top_by_playtime = []
     for pub, total_time in publisher_playtime.most_common(5):
-        top_by_playtime.append({
-            "name": pub,
-            "playtime_hours": round(total_time / 60, 1),
-            "games_count": publisher_count[pub]
-        })
+        top_by_playtime.append({"name": pub, "playtime_hours": round(total_time / 60, 1), "games_count": publisher_count[pub]})
 
-    return {
-        "top_by_playtime": top_by_playtime,
-        "total_publishers": len(publisher_count)
-    }
+    return {"top_by_playtime": top_by_playtime, "total_publishers": len(publisher_count)}
 
 
 def _analyze_playtime_distribution(played_games: list) -> dict[str, Any]:
     """Analyze how playtime is distributed across games"""
 
-    playtime_buckets = {
-        "under_1h": 0,
-        "1_5h": 0,
-        "5_20h": 0,
-        "20_100h": 0,
-        "over_100h": 0
-    }
+    playtime_buckets = {"under_1h": 0, "1_5h": 0, "5_20h": 0, "20_100h": 0, "over_100h": 0}
 
     total_playtime = sum(ug.playtime_forever for ug in played_games)
 
@@ -226,23 +180,13 @@ def _analyze_playtime_distribution(played_games: list) -> dict[str, Any]:
     total_played = len(played_games)
     distribution = {}
     for bucket, count in playtime_buckets.items():
-        distribution[bucket] = {
-            "count": count,
-            "percentage": round((count / total_played) * 100, 1) if total_played > 0 else 0
-        }
+        distribution[bucket] = {"count": count, "percentage": round((count / total_played) * 100, 1) if total_played > 0 else 0}
 
     # Find most played game
     most_played = max(played_games, key=lambda x: x.playtime_forever)
-    most_played_info = {
-        "name": most_played.game.name if most_played.game else "Unknown",
-        "playtime_hours": round(most_played.playtime_forever / 60, 1)
-    }
+    most_played_info = {"name": most_played.game.name if most_played.game else "Unknown", "playtime_hours": round(most_played.playtime_forever / 60, 1)}
 
-    return {
-        "distribution": distribution,
-        "most_played_game": most_played_info,
-        "average_playtime_hours": round(total_playtime / (len(played_games) * 60), 1)
-    }
+    return {"distribution": distribution, "most_played_game": most_played_info, "average_playtime_hours": round(total_playtime / (len(played_games) * 60), 1)}
 
 
 def _analyze_gaming_value(played_games: list) -> dict[str, Any]:
@@ -258,18 +202,12 @@ def _analyze_gaming_value(played_games: list) -> dict[str, Any]:
     for ug in played_games:
         hours = ug.playtime_forever / 60
         if hours > avg_playtime * 1.5:  # 1.5x above average
-            high_value_games.append({
-                "name": ug.game.name if ug.game else "Unknown",
-                "playtime_hours": round(hours, 1)
-            })
+            high_value_games.append({"name": ug.game.name if ug.game else "Unknown", "playtime_hours": round(hours, 1)})
 
     # Sort by playtime and take top 5
     high_value_games.sort(key=lambda x: x["playtime_hours"], reverse=True)
 
-    return {
-        "high_value_games": high_value_games[:5],
-        "total_hours_played": round(total_hours, 1)
-    }
+    return {"high_value_games": high_value_games[:5], "total_hours_played": round(total_hours, 1)}
 
 
 def _analyze_review_preferences(played_games: list) -> dict[str, Any]:
@@ -297,29 +235,19 @@ def _analyze_review_preferences(played_games: list) -> dict[str, Any]:
 
     for review_type, weight in review_tolerance.most_common(3):
         percentage = (weight / total_weight) * 100
-        preferred_types.append({
-            "type": review_type,
-            "preference_percentage": round(percentage, 1)
-        })
+        preferred_types.append({"type": review_type, "preference_percentage": round(percentage, 1)})
 
     # Calculate average rating preference (weighted by playtime)
     avg_rating = total_weighted_rating / sum(ug.playtime_forever for ug in played_games if ug.game and ug.game.reviews)
 
-    return {
-        "preferred_review_types": preferred_types,
-        "average_rating_preference": round(avg_rating, 1)
-    }
+    return {"preferred_review_types": preferred_types, "average_rating_preference": round(avg_rating, 1)}
 
 
 def _analyze_feature_preferences(user_games: list) -> dict[str, Any]:
     """Analyze preferences for game features"""
 
     owned_with_features = 0
-    features = {
-        "steam_deck_verified": {"owned": 0, "played": 0},
-        "controller_support": {"owned": 0, "played": 0},
-        "vr_support": {"owned": 0, "played": 0}
-    }
+    features = {"steam_deck_verified": {"owned": 0, "played": 0}, "controller_support": {"owned": 0, "played": 0}, "vr_support": {"owned": 0, "played": 0}}
 
     for ug in user_games:
         if ug.game:
@@ -348,11 +276,7 @@ def _analyze_feature_preferences(user_games: list) -> dict[str, Any]:
         else:
             play_rate = 0
 
-        feature_stats[feature] = {
-            "owned_count": counts["owned"],
-            "played_count": counts["played"],
-            "play_rate_percentage": round(play_rate, 1)
-        }
+        feature_stats[feature] = {"owned_count": counts["owned"], "played_count": counts["played"], "play_rate_percentage": round(play_rate, 1)}
 
     return feature_stats
 
@@ -386,12 +310,7 @@ def _analyze_activity_trends(played_games: list, time_period: str) -> dict[str, 
 
     top_recent_genre = recent_genres.most_common(1)[0][0] if recent_genres else "None"
 
-    return {
-        "activity_level": activity_level,
-        "recent_hours": round(recent_hours, 1),
-        "recent_games_count": len(recent_games),
-        "top_recent_genre": top_recent_genre
-    }
+    return {"activity_level": activity_level, "recent_hours": round(recent_hours, 1), "recent_games_count": len(recent_games), "top_recent_genre": top_recent_genre}
 
 
 async def _generate_gaming_insights(stats: dict[str, Any], user: UserProfile) -> list[str]:

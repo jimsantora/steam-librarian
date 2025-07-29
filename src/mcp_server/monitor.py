@@ -32,27 +32,15 @@ class ServerMonitor:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{self.base_url}{endpoint}") as response:
-                    if response.content_type == 'application/json':
+                    if response.content_type == "application/json":
                         return await response.json()
                     else:
                         text = await response.text()
-                        return {
-                            "status": "healthy" if response.status == 200 else "unhealthy",
-                            "message": text,
-                            "status_code": response.status
-                        }
+                        return {"status": "healthy" if response.status == 200 else "unhealthy", "message": text, "status_code": response.status}
         except aiohttp.ClientConnectorError:
-            return {
-                "status": "unreachable",
-                "message": f"Cannot connect to server at {self.base_url}",
-                "status_code": 0
-            }
+            return {"status": "unreachable", "message": f"Cannot connect to server at {self.base_url}", "status_code": 0}
         except Exception as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "status_code": 0
-            }
+            return {"status": "error", "message": str(e), "status_code": 0}
 
     async def get_config(self) -> dict[str, Any]:
         """Get server configuration"""
@@ -75,10 +63,9 @@ class ServerMonitor:
     async def list_tools(self) -> dict[str, Any]:
         """List available MCP tools"""
         try:
-            async with aiohttp.ClientSession() as session:
-                # Note: This would require implementing a /tools endpoint or using MCP protocol
-                # For now, return a placeholder
-                return {"message": "Tool listing requires MCP protocol client"}
+            # Note: This would require implementing a /tools endpoint or using MCP protocol
+            # For now, return a placeholder
+            return {"message": "Tool listing requires MCP protocol client"}
         except Exception as e:
             return {"error": str(e)}
 
@@ -207,17 +194,17 @@ async def main():
     health_parser.add_argument("--detailed", action="store_true", help="Get detailed health information")
 
     # Config command
-    config_parser = subparsers.add_parser("config", help="Show server configuration")
+    subparsers.add_parser("config", help="Show server configuration")
 
     # Metrics command
-    metrics_parser = subparsers.add_parser("metrics", help="Show server metrics")
+    subparsers.add_parser("metrics", help="Show server metrics")
 
     # Monitor command (continuous monitoring)
     monitor_parser = subparsers.add_parser("monitor", help="Continuous monitoring")
     monitor_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     # Status command (all info at once)
-    status_parser = subparsers.add_parser("status", help="Show complete server status")
+    subparsers.add_parser("status", help="Show complete server status")
 
     args = parser.parse_args()
 
@@ -229,33 +216,33 @@ async def main():
 
     if args.command == "health":
         health_data = await monitor.check_health(detailed=args.detailed)
-        print(monitor.format_health_status(health_data))
+        print(monitor.format_health_status(health_data))  # noqa: T201
 
     elif args.command == "config":
         config_data = await monitor.get_config()
-        print(monitor.format_config(config_data))
+        print(monitor.format_config(config_data))  # noqa: T201
 
     elif args.command == "metrics":
         metrics_data = await monitor.get_metrics()
-        print(monitor.format_metrics(metrics_data))
+        print(monitor.format_metrics(metrics_data))  # noqa: T201
 
     elif args.command == "status":
-        print("🔍 Fetching complete server status...\n")
+        print("🔍 Fetching complete server status...\n")  # noqa: T201
 
         health_data = await monitor.check_health(detailed=True)
-        print(monitor.format_health_status(health_data))
-        print("\n" + "="*60 + "\n")
+        print(monitor.format_health_status(health_data))  # noqa: T201
+        print("\n" + "=" * 60 + "\n")  # noqa: T201
 
         metrics_data = await monitor.get_metrics()
-        print(monitor.format_metrics(metrics_data))
-        print("\n" + "="*60 + "\n")
+        print(monitor.format_metrics(metrics_data))  # noqa: T201
+        print("\n" + "=" * 60 + "\n")  # noqa: T201
 
         config_data = await monitor.get_config()
-        print(monitor.format_config(config_data))
+        print(monitor.format_config(config_data))  # noqa: T201
 
     elif args.command == "monitor":
-        print(f"🔄 Starting continuous monitoring (interval: {args.interval}s)")
-        print("Press Ctrl+C to stop\n")
+        print(f"🔄 Starting continuous monitoring (interval: {args.interval}s)")  # noqa: T201
+        print("Press Ctrl+C to stop\n")  # noqa: T201
 
         try:
             while True:
@@ -263,24 +250,20 @@ async def main():
                     health_data = await monitor.check_health(detailed=True)
                     metrics_data = await monitor.get_metrics()
 
-                    output = {
-                        "timestamp": datetime.now().isoformat(),
-                        "health": health_data,
-                        "metrics": metrics_data
-                    }
-                    print(json.dumps(output, indent=2))
+                    output = {"timestamp": datetime.now().isoformat(), "health": health_data, "metrics": metrics_data}
+                    print(json.dumps(output, indent=2))  # noqa: T201
                 else:
-                    print(f"📊 Monitor Update - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    print(f"📊 Monitor Update - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")  # noqa: T201
 
                     health_data = await monitor.check_health()
-                    print(monitor.format_health_status(health_data))
+                    print(monitor.format_health_status(health_data))  # noqa: T201
 
-                    print("\n" + "-"*40 + "\n")
+                    print("\n" + "-" * 40 + "\n")  # noqa: T201
 
                 await asyncio.sleep(args.interval)
 
         except KeyboardInterrupt:
-            print("\n🛑 Monitoring stopped")
+            print("\n🛑 Monitoring stopped")  # noqa: T201
 
 
 if __name__ == "__main__":

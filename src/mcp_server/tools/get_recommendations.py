@@ -16,12 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def get_recommendations(
-    user_steam_id: str | None = None,
-    context: dict | None = None
-) -> str:
+async def get_recommendations(user_steam_id: str | None = None, context: dict | None = None) -> str:
     """Get personalized game recommendations based on your library and preferences.
-    
+
     Args:
         user_steam_id: Steam ID of user (optional, will auto-resolve if not provided)
         context: Context for recommendations with keys:
@@ -33,10 +30,7 @@ async def get_recommendations(
 
     # Validate input
     try:
-        input_data = RecommendationsInput(
-            user_steam_id=user_steam_id,
-            context=context or {}
-        )
+        input_data = RecommendationsInput(user_steam_id=user_steam_id, context=context or {})
     except Exception as e:
         return f"Invalid input: {str(e)}"
 
@@ -90,11 +84,7 @@ async def _generate_recommendations(user: UserProfile, context: dict[str, Any]) 
         for game in candidates:
             score = await _calculate_recommendation_score(game, user_profile, context)
             if score > 0.1:  # Minimum relevance threshold
-                scored_candidates.append({
-                    **game,
-                    "score": score,
-                    "reasons": await _generate_recommendation_reasons(game, user_profile, context)
-                })
+                scored_candidates.append({**game, "score": score, "reasons": await _generate_recommendation_reasons(game, user_profile, context)})
 
         # Sort by score and return top recommendations
         scored_candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -105,11 +95,7 @@ async def _analyze_user_profile(session, user: UserProfile) -> dict[str, Any]:
     """Analyze user's gaming preferences from their library"""
 
     # Get user's games with playtime and genres
-    user_games = session.query(UserGame).options(
-        joinedload(UserGame.game).joinedload(Game.genres),
-        joinedload(UserGame.game).joinedload(Game.categories),
-        joinedload(UserGame.game).joinedload(Game.reviews)
-    ).filter(UserGame.steam_id == user.steam_id).all()
+    user_games = session.query(UserGame).options(joinedload(UserGame.game).joinedload(Game.genres), joinedload(UserGame.game).joinedload(Game.categories), joinedload(UserGame.game).joinedload(Game.reviews)).filter(UserGame.steam_id == user.steam_id).all()
 
     played_games = [ug for ug in user_games if ug.playtime_forever > 0]
 
@@ -147,27 +133,14 @@ async def _analyze_user_profile(session, user: UserProfile) -> dict[str, Any]:
         if ug.game and ug.game.reviews and ug.game.reviews.positive_percentage >= 80:
             high_rating_games.append(ug)
 
-    return {
-        "played_games": played_games,
-        "favorite_genres": favorite_genres,
-        "preferred_categories": preferred_categories,
-        "avg_playtime": avg_playtime,
-        "recent_games": recent_games,
-        "high_rating_games": high_rating_games,
-        "total_games": len(user_games),
-        "completion_rate": len(played_games) / len(user_games) if user_games else 0
-    }
+    return {"played_games": played_games, "favorite_genres": favorite_genres, "preferred_categories": preferred_categories, "avg_playtime": avg_playtime, "recent_games": recent_games, "high_rating_games": high_rating_games, "total_games": len(user_games), "completion_rate": len(played_games) / len(user_games) if user_games else 0}
 
 
 async def _get_candidate_games(session, user: UserProfile, context: dict[str, Any]) -> list[dict[str, Any]]:
     """Get candidate games for recommendations"""
 
     # Base query for games
-    query = session.query(Game).options(
-        joinedload(Game.genres),
-        joinedload(Game.categories),
-        joinedload(Game.reviews)
-    )
+    query = session.query(Game).options(joinedload(Game.genres), joinedload(Game.categories), joinedload(Game.reviews))
 
     # Get user's game IDs to check ownership/playtime
     user_game_map = {}
@@ -197,23 +170,7 @@ async def _get_candidate_games(session, user: UserProfile, context: dict[str, An
             if not any(cat.category_name in multiplayer_cats for cat in game.categories):
                 continue
 
-        candidates.append({
-            "app_id": game.app_id,
-            "name": game.name,
-            "genres": [g.genre_name for g in game.genres] if game.genres else [],
-            "categories": [c.category_name for c in game.categories] if game.categories else [],
-            "maturity_rating": game.maturity_rating,
-            "review_data": {
-                "summary": game.reviews.review_summary,
-                "positive_percentage": game.reviews.positive_percentage,
-                "total_reviews": game.reviews.total_reviews
-            } if game.reviews else None,
-            "features": {
-                "steam_deck_verified": game.steam_deck_verified,
-                "controller_support": game.controller_support,
-                "vr_support": game.vr_support
-            }
-        })
+        candidates.append({"app_id": game.app_id, "name": game.name, "genres": [g.genre_name for g in game.genres] if game.genres else [], "categories": [c.category_name for c in game.categories] if game.categories else [], "maturity_rating": game.maturity_rating, "review_data": {"summary": game.reviews.review_summary, "positive_percentage": game.reviews.positive_percentage, "total_reviews": game.reviews.total_reviews} if game.reviews else None, "features": {"steam_deck_verified": game.steam_deck_verified, "controller_support": game.controller_support, "vr_support": game.vr_support}})
 
     return candidates
 
@@ -279,28 +236,7 @@ async def _calculate_recommendation_score(game: dict[str, Any], user_profile: di
 def _get_mood_bonus(game: dict[str, Any], mood: str) -> float:
     """Get mood-based bonus for game recommendation"""
 
-    mood_mappings = {
-        "chill": {
-            "genres": ["Simulation", "Puzzle", "Casual", "Strategy"],
-            "categories": ["Single-player", "Relaxing"]
-        },
-        "intense": {
-            "genres": ["Action", "FPS", "Fighting", "Racing"],
-            "categories": ["Fast-Paced", "Difficult"]
-        },
-        "creative": {
-            "genres": ["Simulation", "Strategy", "Indie"],
-            "categories": ["Building", "Sandbox", "Level Editor"]
-        },
-        "social": {
-            "genres": ["MMO", "Sports"],
-            "categories": ["Multi-player", "Co-op", "Online Co-op"]
-        },
-        "nostalgic": {
-            "genres": ["Retro", "Classic", "Arcade"],
-            "categories": ["2D", "Pixel Graphics"]
-        }
-    }
+    mood_mappings = {"chill": {"genres": ["Simulation", "Puzzle", "Casual", "Strategy"], "categories": ["Single-player", "Relaxing"]}, "intense": {"genres": ["Action", "FPS", "Fighting", "Racing"], "categories": ["Fast-Paced", "Difficult"]}, "creative": {"genres": ["Simulation", "Strategy", "Indie"], "categories": ["Building", "Sandbox", "Level Editor"]}, "social": {"genres": ["MMO", "Sports"], "categories": ["Multi-player", "Co-op", "Online Co-op"]}, "nostalgic": {"genres": ["Retro", "Classic", "Arcade"], "categories": ["2D", "Pixel Graphics"]}}
 
     if mood not in mood_mappings:
         return 0.0
@@ -379,13 +315,7 @@ async def _generate_recommendation_reasons(game: dict[str, Any], user_profile: d
     # Context-based reasons
     mood = context.get("mood")
     if mood:
-        mood_reasons = {
-            "chill": "Perfect for relaxing",
-            "intense": "High-energy gameplay",
-            "creative": "Great for expressing creativity",
-            "social": "Fun to play with others",
-            "nostalgic": "Classic gaming experience"
-        }
+        mood_reasons = {"chill": "Perfect for relaxing", "intense": "High-energy gameplay", "creative": "Great for expressing creativity", "social": "Fun to play with others", "nostalgic": "Classic gaming experience"}
         if mood in mood_reasons:
             reasons.append(mood_reasons[mood])
 
@@ -420,11 +350,7 @@ def _format_context_description(context: dict[str, Any]) -> str:
         parts.append(f"Mood: {context['mood']}")
 
     if context.get("time_available"):
-        time_desc = {
-            "quick": "quick session",
-            "medium": "medium session",
-            "long": "long session"
-        }
+        time_desc = {"quick": "quick session", "medium": "medium session", "long": "long session"}
         parts.append(f"Time: {time_desc.get(context['time_available'], context['time_available'])}")
 
     if context.get("with_friends"):
@@ -447,7 +373,7 @@ def _format_recommendations(recommendations: list[dict[str, Any]]) -> str:
 
     rec_lines = []
 
-    for i, rec in enumerate(recommendations, 1):
+    for _i, rec in enumerate(recommendations, 1):
         # Basic info with score indicator
         confidence = "🔥" if rec["score"] > 0.8 else "⭐" if rec["score"] > 0.6 else "💡"
         line = f"{confidence} **{rec['name']}**"

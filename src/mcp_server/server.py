@@ -10,10 +10,7 @@ from starlette.responses import PlainTextResponse
 from .config import config_manager, settings
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO if settings.debug else logging.WARNING,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO if settings.debug else logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Create the FastMCP server instance for HTTP streaming
@@ -26,12 +23,14 @@ async def health_check(request: Request) -> PlainTextResponse:
     try:
         # Test database connection
         from ..shared.database import get_db
+
         with get_db() as session:
             # Simple query to test DB connectivity
             session.execute("SELECT 1").fetchone()
 
         # Test cache system
         from .cache import cache
+
         await cache.set("health_check", "ok", ttl=60)
         cache_status = await cache.get("health_check")
 
@@ -54,62 +53,36 @@ async def detailed_health_check(request: Request):
 
     from starlette.responses import JSONResponse
 
-    health_data = {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "server": {
-            "name": mcp.name,
-            "version": "2.0.0",
-            "python_version": sys.version,
-            "pid": os.getpid()
-        },
-        "components": {}
-    }
+    health_data = {"status": "healthy", "timestamp": datetime.utcnow().isoformat(), "server": {"name": mcp.name, "version": "2.0.0", "python_version": sys.version, "pid": os.getpid()}, "components": {}}
 
     # Test database
     try:
         from ..shared.database import get_db
+
         with get_db() as session:
             result = session.execute("SELECT COUNT(*) FROM user_profiles").scalar()
-            health_data["components"]["database"] = {
-                "status": "healthy",
-                "user_count": result
-            }
+            health_data["components"]["database"] = {"status": "healthy", "user_count": result}
     except Exception as e:
-        health_data["components"]["database"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        health_data["components"]["database"] = {"status": "unhealthy", "error": str(e)}
         health_data["status"] = "unhealthy"
 
     # Test cache
     try:
         from .cache import cache
+
         await cache.set("health_detailed", "test", ttl=60)
         cache_result = await cache.get("health_detailed")
-        health_data["components"]["cache"] = {
-            "status": "healthy" if cache_result == "test" else "unhealthy"
-        }
+        health_data["components"]["cache"] = {"status": "healthy" if cache_result == "test" else "unhealthy"}
     except Exception as e:
-        health_data["components"]["cache"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        health_data["components"]["cache"] = {"status": "unhealthy", "error": str(e)}
         health_data["status"] = "unhealthy"
 
     # Test tools
     try:
         tools = await mcp.list_tools()
-        health_data["components"]["tools"] = {
-            "status": "healthy",
-            "count": len(tools),
-            "available": [tool.name for tool in tools]
-        }
+        health_data["components"]["tools"] = {"status": "healthy", "count": len(tools), "available": [tool.name for tool in tools]}
     except Exception as e:
-        health_data["components"]["tools"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        health_data["components"]["tools"] = {"status": "unhealthy", "error": str(e)}
         health_data["status"] = "unhealthy"
 
     status_code = 200 if health_data["status"] == "healthy" else 503
@@ -121,12 +94,7 @@ async def get_configuration(request: Request):
     """Get current server configuration"""
     from starlette.responses import JSONResponse
 
-    config_data = {
-        "server_info": config_manager.get_server_info(),
-        "performance": config_manager.get_performance_config(),
-        "features": config_manager.get_feature_flags(),
-        "validation": config_manager.validate_configuration()
-    }
+    config_data = {"server_info": config_manager.get_server_info(), "performance": config_manager.get_performance_config(), "features": config_manager.get_feature_flags(), "validation": config_manager.validate_configuration()}
 
     return JSONResponse(config_data)
 
@@ -144,60 +112,33 @@ async def get_metrics(request: Request):
         # System metrics
         process = psutil.Process(os.getpid())
 
-        metrics_data = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "system": {
-                "cpu_percent": process.cpu_percent(),
-                "memory_mb": round(process.memory_info().rss / 1024 / 1024, 2),
-                "memory_percent": process.memory_percent(),
-                "threads": process.num_threads(),
-                "uptime_seconds": round((datetime.now() - datetime.fromtimestamp(process.create_time())).total_seconds())
-            },
-            "server": {
-                "name": mcp.name,
-                "version": "2.0.0",
-                "pid": os.getpid()
-            }
-        }
+        metrics_data = {"timestamp": datetime.utcnow().isoformat(), "system": {"cpu_percent": process.cpu_percent(), "memory_mb": round(process.memory_info().rss / 1024 / 1024, 2), "memory_percent": process.memory_percent(), "threads": process.num_threads(), "uptime_seconds": round((datetime.now() - datetime.fromtimestamp(process.create_time())).total_seconds())}, "server": {"name": mcp.name, "version": "2.0.0", "pid": os.getpid()}}
 
         # Add cache metrics if available
         try:
             from .cache import cache
-            if hasattr(cache, '_cache'):
-                metrics_data["cache"] = {
-                    "size": len(cache._cache),
-                    "max_size": settings.cache_max_size,
-                    "hit_rate": getattr(cache, '_hit_rate', 0.0)
-                }
-        except:
+
+            if hasattr(cache, "_cache"):
+                metrics_data["cache"] = {"size": len(cache._cache), "max_size": settings.cache_max_size, "hit_rate": getattr(cache, "_hit_rate", 0.0)}
+        except Exception:
             pass
 
         # Add database metrics if available
         try:
             from ..shared.database import get_db
+
             with get_db() as session:
                 user_count = session.execute("SELECT COUNT(*) FROM user_profiles").scalar()
                 game_count = session.execute("SELECT COUNT(*) FROM games").scalar()
-                metrics_data["database"] = {
-                    "users": user_count,
-                    "games": game_count
-                }
-        except:
+                metrics_data["database"] = {"users": user_count, "games": game_count}
+        except Exception:
             pass
 
         return JSONResponse(metrics_data)
 
     except ImportError:
         # psutil not available
-        basic_metrics = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "server": {
-                "name": mcp.name,
-                "version": "2.0.0",
-                "pid": os.getpid()
-            },
-            "note": "Install psutil for detailed system metrics"
-        }
+        basic_metrics = {"timestamp": datetime.utcnow().isoformat(), "server": {"name": mcp.name, "version": "2.0.0", "pid": os.getpid()}, "note": "Install psutil for detailed system metrics"}
         return JSONResponse(basic_metrics)
     except Exception as e:
         logger.error(f"Metrics collection failed: {e}")

@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
 from src.shared.database import UserProfile, get_db
 
@@ -17,13 +17,10 @@ from .errors import multiple_users_error, no_users_error, user_not_found_error
 logger = logging.getLogger(__name__)
 
 
-async def resolve_user_context(
-    user_steam_id: str | None = None,
-    session: Session | None = None
-) -> dict[str, Any]:
+async def resolve_user_context(user_steam_id: str | None = None, session: Session | None = None) -> dict[str, Any]:
     """
     Resolve user context with intelligent fallbacks.
-    
+
     Returns dict with either:
     - {"user": UserProfile, "source": str} on success
     - {"error": str, ...} on failure
@@ -49,9 +46,7 @@ async def _resolve_user_internal(user_steam_id: str | None, session: Session) ->
             return {"user": user, "source": "provided"}
 
         # Try persona name match (case-insensitive)
-        user = session.query(UserProfile).filter(
-            UserProfile.persona_name.ilike(user_steam_id)
-        ).first()
+        user = session.query(UserProfile).filter(UserProfile.persona_name.ilike(user_steam_id)).first()
         if user:
             logger.debug(f"Found user by persona name: {user_steam_id}")
             return {"user": user, "source": "provided_name"}
@@ -59,11 +54,7 @@ async def _resolve_user_internal(user_steam_id: str | None, session: Session) ->
         # User not found
         logger.warning(f"User not found: {user_steam_id}")
         error = user_not_found_error(user_steam_id)
-        return {
-            "error": error.error_type.value,
-            "message": error.message,
-            "details": error.details
-        }
+        return {"error": error.error_type.value, "message": error.message, "details": error.details}
 
     # Case 2: Try environment default
     if DEFAULT_STEAM_ID:
@@ -84,19 +75,11 @@ async def _resolve_user_internal(user_steam_id: str | None, session: Session) ->
     elif user_count > 1:
         logger.info(f"Multiple users found ({user_count}), user selection required")
         error = multiple_users_error(users)
-        return {
-            "error": error.error_type.value,
-            "message": error.message,
-            "details": error.details
-        }
+        return {"error": error.error_type.value, "message": error.message, "details": error.details}
     else:
         logger.warning("No users found in database")
         error = no_users_error()
-        return {
-            "error": error.error_type.value,
-            "message": error.message,
-            "details": error.details
-        }
+        return {"error": error.error_type.value, "message": error.message, "details": error.details}
 
 
 def get_user_display_name(user: UserProfile) -> str:
@@ -115,10 +98,7 @@ def format_user_context_error(context: dict[str, Any]) -> str:
     details = context.get("details", {})
 
     if context["error"] == "MULTIPLE_USERS_FOUND" and "available_users" in details:
-        users_list = "\n".join([
-            f"  - {u['persona_name']} (Steam ID: {u['steam_id']})"
-            for u in details["available_users"]
-        ])
+        users_list = "\n".join([f"  - {u['persona_name']} (Steam ID: {u['steam_id']})" for u in details["available_users"]])
         return f"{message}\n\nAvailable users:\n{users_list}"
 
     return message

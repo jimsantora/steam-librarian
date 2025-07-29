@@ -15,26 +15,13 @@ async def get_games_by_genre(user: UserProfile, genre_name: str) -> list[dict[st
 
     with get_db() as session:
         # Get games matching the genre
-        user_games = session.query(UserGame).options(
-            joinedload(UserGame.game).joinedload(Game.genres),
-            joinedload(UserGame.game).joinedload(Game.reviews)
-        ).join(UserGame.game).join(Game.genres).filter(
-            UserGame.steam_id == user.steam_id,
-            Genre.genre_name.ilike(f"%{genre_name}%")
-        ).all()
+        user_games = session.query(UserGame).options(joinedload(UserGame.game).joinedload(Game.genres), joinedload(UserGame.game).joinedload(Game.reviews)).join(UserGame.game).join(Game.genres).filter(UserGame.steam_id == user.steam_id, Genre.genre_name.ilike(f"%{genre_name}%")).all()
 
         # Format results
         games = []
         for ug in user_games:
             if ug.game:
-                game_data = {
-                    "app_id": ug.game.app_id,
-                    "name": ug.game.name,
-                    "playtime_hours": round(ug.playtime_forever / 60, 1),
-                    "recent_playtime_hours": round(ug.playtime_2weeks / 60, 1),
-                    "genres": [g.genre_name for g in ug.game.genres],
-                    "is_unplayed": ug.playtime_forever == 0
-                }
+                game_data = {"app_id": ug.game.app_id, "name": ug.game.name, "playtime_hours": round(ug.playtime_forever / 60, 1), "recent_playtime_hours": round(ug.playtime_2weeks / 60, 1), "genres": [g.genre_name for g in ug.game.genres], "is_unplayed": ug.playtime_forever == 0}
 
                 # Add review data if available
                 if ug.game.reviews:

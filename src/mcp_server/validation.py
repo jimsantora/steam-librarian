@@ -41,14 +41,7 @@ class QuerySanitizer:
             raise ValueError("Query cannot be empty")
 
         # Remove SQL injection attempts
-        dangerous_patterns = [
-            r";\s*DROP",
-            r";\s*DELETE",
-            r"UNION\s+SELECT",
-            r"OR\s+1=1",
-            r"--\s*$",
-            r"/\*.*\*/"
-        ]
+        dangerous_patterns = [r";\s*DROP", r";\s*DELETE", r"UNION\s+SELECT", r"OR\s+1=1", r"--\s*$", r"/\*.*\*/"]
 
         for pattern in dangerous_patterns:
             if re.search(pattern, query, re.IGNORECASE):
@@ -67,15 +60,16 @@ class QuerySanitizer:
 # Pydantic models for input validation
 class SearchGamesInput(BaseModel):
     """Validate search_games tool input"""
+
     query: str = Field(..., min_length=1, max_length=200)
     user_steam_id: str | None = None
 
-    @field_validator('query')
+    @field_validator("query")
     @classmethod
     def sanitize_query(cls, v):
         return QuerySanitizer.sanitize(v)
 
-    @field_validator('user_steam_id')
+    @field_validator("user_steam_id")
     @classmethod
     def validate_steam_id(cls, v):
         if v:
@@ -85,6 +79,7 @@ class SearchGamesInput(BaseModel):
 
 class FilterGamesInput(BaseModel):
     """Validate filter_games tool input"""
+
     user_steam_id: str | None = None
     playtime_min: float | None = Field(None, ge=0)
     playtime_max: float | None = Field(None, ge=0)
@@ -94,35 +89,31 @@ class FilterGamesInput(BaseModel):
     categories: list[str] | None = None
     sort_by: str | None = None
 
-    @field_validator('user_steam_id')
+    @field_validator("user_steam_id")
     @classmethod
     def validate_steam_id(cls, v):
         if v:
             return SteamIDValidator.validate(v)
         return v
 
-    @field_validator('playtime_min', 'playtime_max')
+    @field_validator("playtime_min", "playtime_max")
     @classmethod
     def validate_playtime(cls, v):
         if v is not None and v < 0:
             raise ValueError("Playtime cannot be negative")
         return v
 
-    @field_validator('review_summary')
+    @field_validator("review_summary")
     @classmethod
     def validate_review_summary(cls, v):
         if v:
-            valid_summaries = [
-                "Overwhelmingly Positive", "Very Positive", "Positive",
-                "Mostly Positive", "Mixed", "Mostly Negative", "Negative",
-                "Very Negative", "Overwhelmingly Negative"
-            ]
+            valid_summaries = ["Overwhelmingly Positive", "Very Positive", "Positive", "Mostly Positive", "Mixed", "Mostly Negative", "Negative", "Very Negative", "Overwhelmingly Negative"]
             for summary in v:
                 if summary not in valid_summaries:
                     raise ValueError(f"Invalid review summary: {summary}")
         return v
 
-    @field_validator('preset')
+    @field_validator("preset")
     @classmethod
     def validate_preset(cls, v):
         if v:
@@ -134,15 +125,16 @@ class FilterGamesInput(BaseModel):
 
 class RecommendationsInput(BaseModel):
     """Validate get_recommendations tool input"""
+
     user_steam_id: str
     context: dict | None = None
 
-    @field_validator('user_steam_id')
+    @field_validator("user_steam_id")
     @classmethod
     def validate_steam_id(cls, v):
         return SteamIDValidator.validate(v)
 
-    @field_validator('context')
+    @field_validator("context")
     @classmethod
     def validate_context(cls, v):
         if v:
@@ -156,12 +148,13 @@ class RecommendationsInput(BaseModel):
 
 class FriendsDataInput(BaseModel):
     """Validate get_friends_data tool input"""
+
     data_type: str
     user_steam_id: str | None = None
     friend_steam_id: str | None = None
     game_identifier: str | None = None
 
-    @field_validator('data_type')
+    @field_validator("data_type")
     @classmethod
     def validate_data_type(cls, v):
         valid_types = ["common_games", "friend_activity", "multiplayer_compatible", "compatibility_score"]
@@ -169,7 +162,7 @@ class FriendsDataInput(BaseModel):
             raise ValueError(f"Invalid data type: {v}")
         return v
 
-    @field_validator('user_steam_id', 'friend_steam_id')
+    @field_validator("user_steam_id", "friend_steam_id")
     @classmethod
     def validate_steam_id(cls, v):
         if v:
@@ -179,16 +172,17 @@ class FriendsDataInput(BaseModel):
 
 class LibraryStatsInput(BaseModel):
     """Validate get_library_stats tool input"""
+
     user_steam_id: str
     time_period: str | None = "all_time"
     include_insights: bool = True
 
-    @field_validator('user_steam_id')
+    @field_validator("user_steam_id")
     @classmethod
     def validate_steam_id(cls, v):
         return SteamIDValidator.validate(v)
 
-    @field_validator('time_period')
+    @field_validator("time_period")
     @classmethod
     def validate_time_period(cls, v):
         valid_periods = ["all_time", "last_year", "last_6_months", "last_month", "last_week"]

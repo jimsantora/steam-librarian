@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class ErrorType(Enum):
     """Standardized error types for consistent handling"""
+
     USER_NOT_FOUND = "USER_NOT_FOUND"
     GAME_NOT_FOUND = "GAME_NOT_FOUND"
     DATABASE_ERROR = "DATABASE_ERROR"
@@ -37,12 +38,7 @@ class MCPError(Exception):
 
 def create_error_response(error_type: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create standardized error response"""
-    response = {
-        "error": True,
-        "error_type": error_type,
-        "message": message,
-        "timestamp": datetime.now().isoformat()
-    }
+    response = {"error": True, "error_type": error_type, "message": message, "timestamp": datetime.now().isoformat()}
     if details:
         response["details"] = details
     return response
@@ -51,14 +47,12 @@ def create_error_response(error_type: str, message: str, details: dict[str, Any]
 def create_error_content(error_type: str, message: str, details: dict[str, Any] | None = None) -> list[TextContent]:
     """Create error response as TextContent for MCP tools"""
     error_response = create_error_response(error_type, message, details)
-    return [TextContent(
-        type="text",
-        text=f"Error: {message}\n\nDetails: {error_response}"
-    )]
+    return [TextContent(type="text", text=f"Error: {message}\n\nDetails: {error_response}")]
 
 
 def handle_mcp_errors(func):
     """Decorator for consistent error handling across all MCP handlers"""
+
     @wraps(func)
     async def wrapper(*args, **kwargs):
         try:
@@ -74,51 +68,27 @@ def handle_mcp_errors(func):
             return create_error_content(ErrorType.TIMEOUT_ERROR.value, "Operation timed out")
         except Exception as e:
             logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
-            return create_error_content(
-                ErrorType.DATABASE_ERROR.value,
-                "An unexpected error occurred",
-                {"error": str(e)}
-            )
+            return create_error_content(ErrorType.DATABASE_ERROR.value, "An unexpected error occurred", {"error": str(e)})
+
     return wrapper
 
 
 # Specific error helpers
 def user_not_found_error(user_identifier: str) -> MCPError:
     """Create user not found error"""
-    return MCPError(
-        ErrorType.USER_NOT_FOUND,
-        f"User not found: {user_identifier}",
-        {"user_identifier": user_identifier, "suggestion": "Use get_all_users() to see available users"}
-    )
+    return MCPError(ErrorType.USER_NOT_FOUND, f"User not found: {user_identifier}", {"user_identifier": user_identifier, "suggestion": "Use get_all_users() to see available users"})
 
 
 def game_not_found_error(game_identifier: str) -> MCPError:
     """Create game not found error"""
-    return MCPError(
-        ErrorType.GAME_NOT_FOUND,
-        f"Game not found: {game_identifier}",
-        {"game_identifier": game_identifier}
-    )
+    return MCPError(ErrorType.GAME_NOT_FOUND, f"Game not found: {game_identifier}", {"game_identifier": game_identifier})
 
 
 def multiple_users_error(users: list) -> MCPError:
     """Create multiple users found error"""
-    return MCPError(
-        ErrorType.MULTIPLE_USERS_FOUND,
-        "Multiple users found. Please specify which user by Steam ID",
-        {
-            "available_users": [
-                {"steam_id": user.steam_id, "persona_name": user.persona_name}
-                for user in users
-            ]
-        }
-    )
+    return MCPError(ErrorType.MULTIPLE_USERS_FOUND, "Multiple users found. Please specify which user by Steam ID", {"available_users": [{"steam_id": user.steam_id, "persona_name": user.persona_name} for user in users]})
 
 
 def no_users_error() -> MCPError:
     """Create no users found error"""
-    return MCPError(
-        ErrorType.NO_USERS_FOUND,
-        "No users found in database. Please fetch Steam library data first.",
-        {}
-    )
+    return MCPError(ErrorType.NO_USERS_FOUND, "No users found in database. Please fetch Steam library data first.", {})

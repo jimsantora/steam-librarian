@@ -63,12 +63,7 @@ class SmartCache:
         ttl = ttl or settings.cache_ttl
         await self._cache_value(key, value, ttl)
 
-    async def get_or_compute(
-        self,
-        key: str,
-        compute_func: Callable,
-        ttl: int = None
-    ) -> Any:
+    async def get_or_compute(self, key: str, compute_func: Callable, ttl: int = None) -> Any:
         """Get value from cache or compute it"""
         if not settings.enable_cache:
             return await compute_func()
@@ -147,15 +142,10 @@ class SmartCache:
     async def _save_to_disk(self, key: str, value: Any, ttl: int):
         """Save value to disk cache"""
         cache_file = self.cache_dir / f"{key}.json"
-        cache_data = {
-            "value": value,
-            "timestamp": time.time(),
-            "ttl": ttl,
-            "expires": datetime.now().isoformat()
-        }
+        cache_data = {"value": value, "timestamp": time.time(), "ttl": ttl, "expires": datetime.now().isoformat()}
 
         try:
-            with open(cache_file, 'w') as f:
+            with open(cache_file, "w") as f:
                 json.dump(cache_data, f)
         except Exception as e:
             logger.error(f"Error saving cache file {cache_file}: {e}")
@@ -172,7 +162,7 @@ class SmartCache:
                 # Clean memory cache
                 current_time = time.time()
                 expired_keys = []
-                for key, (value, timestamp) in self.memory_cache.items():
+                for key, (_value, timestamp) in self.memory_cache.items():
                     if current_time - timestamp > settings.cache_ttl:
                         expired_keys.append(key)
 
