@@ -146,14 +146,17 @@ async def get_metrics(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# Import and register tools (resources and prompts registration postponed for FastMCP compatibility)
+# Import and register all MCP components
 try:
     from .tools import register_tools
 
     # Register tools with the FastMCP server (tools are imported and registered via @mcp.tool() decorators)
     register_tools(mcp)
 
-    logger.info("Steam Librarian MCP Server tools registered successfully")
+    # Import resources and prompts to register their decorators
+    from . import resources, prompts
+
+    logger.info("Steam Librarian MCP Server tools, resources, and prompts registered successfully")
 
 except Exception as e:
     logger.error(f"Failed to register MCP components: {e}")

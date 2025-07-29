@@ -3,88 +3,92 @@
 import logging
 from typing import Any
 
-from mcp.server import Server
-from mcp.types import Prompt, PromptArgument, PromptMessage
+from mcp_server.server import mcp
 
 logger = logging.getLogger(__name__)
 
 
-def register_library_prompts(server: Server):
-    """Register library-focused prompts"""
+@mcp.prompt()
+async def rediscover_library(mood: str = "any", time_available: str = "any") -> str:
+    """Find something you already own to play - intelligent library rediscovery"""
+    
+    return f"""I want to find something to play from my Steam library. 
 
-    @server.list_prompts()
-    async def list_prompts() -> list[Prompt]:
-        return [Prompt(name="rediscover_library", description="Find something you already own to play", arguments=[PromptArgument(name="mood", description="What kind of gaming mood are you in? (e.g., relaxing, intense, social)", required=False), PromptArgument(name="time_available", description="How much time do you have? (e.g., '30 minutes', '2 hours')", required=False)]), Prompt(name="gaming_therapy", description="Get gaming recommendations based on how you're feeling", arguments=[PromptArgument(name="feeling", description="How are you feeling today?", required=True), PromptArgument(name="energy_level", description="Low, medium, or high energy?", required=False)]), Prompt(name="weekend_planner", description="Plan your weekend gaming sessions", arguments=[PromptArgument(name="available_hours", description="How many hours for gaming?", required=True), PromptArgument(name="solo_or_social", description="Solo, friends, or both?", required=False)]), Prompt(name="backlog_therapist", description="Get help tackling your backlog without overwhelm", arguments=[PromptArgument(name="commitment_level", description="Light, medium, or deep commitment?", required=False)])]
+My current mood: {mood}
+Time available: {time_available}
 
-    @server.get_prompt()
-    async def get_prompt(name: str, arguments: dict[str, Any]) -> list[PromptMessage]:
-        if name == "rediscover_library":
-            return await rediscover_library_prompt(arguments)
-        elif name == "gaming_therapy":
-            return await gaming_therapy_prompt(arguments)
-        elif name == "weekend_planner":
-            return await weekend_planner_prompt(arguments)
-        elif name == "backlog_therapist":
-            return await backlog_therapist_prompt(arguments)
-        return []
+Please help me rediscover something perfect from my library by:
+1. First checking what I've been playing recently to avoid repetition (use library://activity/recent resource)
+2. Then using the get_recommendations tool with context about my mood and available time
+3. Focus on games I already own but might have forgotten about or haven't played in a while
+
+Make your recommendations personal and consider both my mood and time constraints."""
 
 
-async def rediscover_library_prompt(arguments: dict[str, Any]) -> list[PromptMessage]:
-    """The signature experience - intelligent library rediscovery"""
-
-    mood = arguments.get("mood", "any")
-    time_available = arguments.get("time_available", "any")
-
-    messages = [PromptMessage(role="user", content={"type": "text", "text": f"I want to find something to play from my Steam library. Mood: {mood}. Time available: {time_available}."}), PromptMessage(role="assistant", content={"type": "text", "text": "Let me help you rediscover something perfect from your library. First, I'll check what you've been playing recently to avoid repetition..."}), PromptMessage(role="assistant", content={"type": "resource", "resource": {"uri": "library://activity/recent", "text": "Checking recent activity"}}), PromptMessage(role="assistant", content={"type": "text", "text": "Now let me find games that match your current mood and available time..."}), PromptMessage(role="assistant", content={"type": "tool_use", "name": "get_recommendations", "arguments": {"context": {"mood": mood, "time_available": time_available, "exclude_recent": True}}})]
-
-    return messages
-
-
-async def gaming_therapy_prompt(arguments: dict[str, Any]) -> list[PromptMessage]:
-    """Get gaming recommendations based on emotional state"""
-
-    feeling = arguments.get("feeling", "")
-    energy_level = arguments.get("energy_level", "medium")
-
+@mcp.prompt()
+async def gaming_therapy(feeling: str, energy_level: str = "medium") -> str:
+    """Get gaming recommendations based on how you're feeling"""
+    
     # Map feelings to gaming moods
-    feeling_to_mood = {"stressed": "relaxing", "anxious": "calming", "bored": "engaging", "sad": "uplifting", "angry": "cathartic", "happy": "social", "tired": "casual"}
-
+    feeling_to_mood = {
+        "stressed": "relaxing", "anxious": "calming", "bored": "engaging", 
+        "sad": "uplifting", "angry": "cathartic", "happy": "social", "tired": "casual"
+    }
+    
     mood = "any"
     for key, value in feeling_to_mood.items():
         if key in feeling.lower():
             mood = value
             break
+    
+    return f"""I'm feeling {feeling} with {energy_level} energy. What should I play?
 
-    messages = [PromptMessage(role="user", content={"type": "text", "text": f"I'm feeling {feeling} with {energy_level} energy. What should I play?"}), PromptMessage(role="assistant", content={"type": "text", "text": f"I understand you're feeling {feeling}. Let me find games that might help..."}), PromptMessage(role="assistant", content={"type": "tool_use", "name": "search_games", "arguments": {"query": f"{mood} games for {energy_level} energy"}})]
+I understand you're feeling {feeling}. Let me find games that might help by:
+1. Using the search_games tool to find {mood} games suitable for {energy_level} energy
+2. Recommending games that match your emotional state and energy level
+3. Suggesting games that can help you feel better or match your current mood
 
-    return messages
+Please provide personalized recommendations that consider both my emotional state and energy level."""
 
 
-async def weekend_planner_prompt(arguments: dict[str, Any]) -> list[PromptMessage]:
-    """Plan weekend gaming sessions"""
-
-    available_hours = arguments.get("available_hours", "")
-    solo_or_social = arguments.get("solo_or_social", "both")
-
-    messages = [PromptMessage(role="user", content={"type": "text", "text": f"I have {available_hours} hours for gaming this weekend. Preference: {solo_or_social}."}), PromptMessage(role="assistant", content={"type": "text", "text": "Let me help you plan an awesome gaming weekend! First, let me check your library stats to understand your preferences..."}), PromptMessage(role="assistant", content={"type": "tool_use", "name": "get_library_stats", "arguments": {"include_insights": True}})]
-
+@mcp.prompt()  
+async def weekend_planner(available_hours: str, solo_or_social: str = "both") -> str:
+    """Plan your weekend gaming sessions"""
+    
+    social_planning = ""
     if solo_or_social in ["social", "both"]:
-        messages.append(PromptMessage(role="assistant", content={"type": "text", "text": "Now let me check what multiplayer games you and your friends could enjoy..."}))
-        messages.append(PromptMessage(role="assistant", content={"type": "tool_use", "name": "get_friends_data", "arguments": {"data_type": "multiplayer_compatible"}}))
+        social_planning = """
+4. Check multiplayer games using get_friends_data tool to see what games you and your friends could enjoy together"""
+    
+    return f"""I have {available_hours} hours for gaming this weekend. Preference: {solo_or_social}.
 
-    return messages
+Help me plan an awesome gaming weekend by:
+1. First checking my library stats using get_library_stats tool to understand my preferences
+2. Suggesting a mix of games that fit within my {available_hours} time budget
+3. Balancing different types of games (quick sessions vs longer experiences){social_planning}
+
+Create a structured weekend gaming plan that maximizes enjoyment within my time constraints."""
 
 
-async def backlog_therapist_prompt(arguments: dict[str, Any]) -> list[PromptMessage]:
-    """Help tackle gaming backlog"""
+@mcp.prompt()
+async def backlog_therapist(commitment_level: str = "medium") -> str:
+    """Get help tackling your backlog without overwhelm"""
+    
+    # Map commitment to approach
+    commitment_approaches = {
+        "light": "short games (under 10 hours) that you can finish quickly", 
+        "medium": "moderately-sized games (10-50 hours) that offer good value",
+        "deep": "longer games (10+ hours) that you can really sink into"
+    }
+    
+    approach = commitment_approaches.get(commitment_level, "games that match your commitment level")
+    
+    return f"""Help me tackle my backlog with {commitment_level} commitment level.
 
-    commitment_level = arguments.get("commitment_level", "medium")
+Let's tackle that backlog together! Please help by:
+1. Using the filter_games tool with the "hidden_gems" preset to find neglected games
+2. Focusing on {approach}
+3. Prioritizing games based on my preferences and the time I want to invest
+4. Providing a manageable plan that won't overwhelm me
 
-    # Map commitment to playtime ranges
-    commitment_to_playtime = {"light": {"max": 10}, "medium": {"min": 0, "max": 50}, "deep": {"min": 10}}
-
-    playtime_filter = commitment_to_playtime.get(commitment_level, {})
-
-    messages = [PromptMessage(role="user", content={"type": "text", "text": f"Help me tackle my backlog with {commitment_level} commitment level."}), PromptMessage(role="assistant", content={"type": "text", "text": "Let's tackle that backlog together! First, let me see what hidden gems you've been neglecting..."}), PromptMessage(role="assistant", content={"type": "tool_use", "name": "filter_games", "arguments": {"preset": "hidden_gems", **playtime_filter}})]
-
-    return messages
+Give me actionable suggestions for which games to tackle first based on my {commitment_level} commitment level."""

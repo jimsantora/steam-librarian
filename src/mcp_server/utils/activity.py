@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import joinedload
 
-from ...shared.database import Game, UserGame, UserProfile, get_db
+from shared.database import Game, UserGame, UserProfile, get_db
 
 logger = logging.getLogger(__name__)
 

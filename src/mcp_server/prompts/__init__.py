@@ -1,15 +1,7 @@
-"""Prompts registration for Steam Librarian MCP Server"""
+"""Prompts for Steam Librarian MCP Server - FastMCP Compatible"""
 
-from mcp.server import Server
-from mcp.types import Prompt, PromptArgument
-
-from .insight_prompts import register_insight_prompts
-from .library_prompts import register_library_prompts
-from .social_prompts import register_social_prompts
-
-
-def register_prompts(server: Server):
-    """Register all prompts with the MCP server"""
-    register_library_prompts(server)
-    register_social_prompts(server)
-    register_insight_prompts(server)
+# FastMCP prompts are registered via decorators on import
+# Import prompt modules to register their @mcp.prompt() decorators
+from . import library_prompts
+# TODO: Convert other prompt modules to FastMCP format
+# from . import insight_prompts, social_prompts

@@ -1,14 +1,7 @@
-"""Resources registration for Steam Librarian MCP Server"""
+"""Resources for Steam Librarian MCP Server - FastMCP Compatible"""    
 
-from mcp.server import Server
-
-from .insight_resources import register_insight_resources
-from .library_resources import register_library_resources
-from .social_resources import register_social_resources
-
-
-def register_resources(server: Server):
-    """Register all resources with the MCP server"""
-    register_library_resources(server)
-    register_social_resources(server)
-    register_insight_resources(server)
+# FastMCP resources are registered via decorators on import
+# Import resource modules to register their @mcp.resource() decorators
+from . import library_resources
+# TODO: Convert other resource modules to FastMCP format 
+# from . import insight_resources, social_resources

@@ -7,9 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import joinedload
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
-
-from src.shared.database import Game, UserGame, UserProfile, get_db
+from shared.database import Game, UserGame, UserProfile, get_db
 
 logger = logging.getLogger(__name__)
 
