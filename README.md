@@ -5,7 +5,7 @@
 <h1 align="center">Steam Librarian</h1>
 
 <p align="center">
-  <em><strong>Your personal game archivist and curator.</strong> They know your library inside and out, can compare collections with friends, suggest your next adventure, and share deep insights about every game on your digital shelves.</em>
+  <em><strong>Your Steam collection, curated by an AI-powered librarian.</strong> Natural language search, mood-based recommendations, and social insights that actually help you pick the perfect game.</em>
 </p>
 
 <p align="center">
@@ -16,11 +16,9 @@
   <a href="https://github.com/anthropics/mcp"><img src="https://img.shields.io/badge/MCP-Protocol-green" alt="MCP Protocol"></a>
 </p>
 
-A powerful Model Context Protocol (MCP) server that provides intelligent access to your Steam library data through natural language processing, personalized recommendations, and advanced gaming analytics. Built with FastMCP and featuring HTTP streaming, smart caching, and comprehensive testing.
+Steam Librarian is your digital gaming archivist - an intelligent Model Context Protocol (MCP) server that transforms how you interact with your Steam library. Our core philosophy addresses a universal gamer problem: extensive libraries filled with unplayed gems, forgotten favorites, and impulse purchases create decision paralysis where we spend more time browsing than playing. Like a knowledgeable librarian who knows every book on the shelf, Steam Librarian analyzes your gaming patterns, respects your time, and serves as your personal curator.
 
-**Your Intelligent Gaming Companion** - Search games with natural language ("chill puzzle games for tonight"), get AI-powered personalized recommendations, analyze your gaming patterns with detailed insights, and discover social gaming opportunities with friends through compatibility scoring.
-
-This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built as a learning experience and comprehensive example of creating a production-ready MCP server.
+This dedicated record keeper tracks your play history and preferences, helps you find games that match your current mood and available time, understands what your friends are playing, and can suggest the perfect game for any situation. Built with FastMCP and featuring HTTP streaming, smart caching, comprehensive testing, and production-ready architecture, it serves as both a practical gaming tool and a comprehensive example of creating an intelligent MCP server.
 
 <details>
 <summary><strong>Table of Contents</strong></summary>
