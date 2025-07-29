@@ -803,7 +803,10 @@ Cache missing set/get methods
 python -c "from src.mcp_server.cache import cache; print(hasattr(cache, 'get'))"
 ```
 
-### Performance Tuning
+<br>
+
+---
+# Performance Tuning
 
 For high-load scenarios, adjust settings:
 ```bash
@@ -821,7 +824,10 @@ CACHE_TTL_USER=600
 MAX_CONCURRENT_REQUESTS=500
 ```
 
-## Integration Examples
+<br>
+
+---
+# Integration Examples
 
 ### Claude Desktop Integration
 
@@ -894,14 +900,20 @@ results = asyncio.run(search_games("chill puzzle games"))
 - **Memory Management**: Cache has configurable size limits
 - **Request Timeouts**: Configurable timeouts prevent hanging requests
 
-## Security Notes
+<br>
+
+---
+# Security Notes
 
 - The server binds to `0.0.0.0` by default - restrict in production
 - Database credentials are hidden in configuration endpoints
 - No authentication is built-in - add reverse proxy authentication if needed
 - Steam API keys are optional and stored securely in environment variables
 
-## Future Enhancements
+<br>
+
+---
+# Future Enhancements
 
 - WebSocket support for real-time updates
 - Redis cache backend for distributed deployments

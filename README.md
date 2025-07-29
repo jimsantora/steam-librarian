@@ -20,9 +20,41 @@ A powerful Model Context Protocol (MCP) server that provides intelligent access 
 
 **Your Intelligent Gaming Companion** - Search games with natural language ("chill puzzle games for tonight"), get AI-powered personalized recommendations, analyze your gaming patterns with detailed insights, and discover social gaming opportunities with friends through compatibility scoring.
 
-This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built as a learning experience and comprehensive example of creating a production-ready MCP server. 
+This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built as a learning experience and comprehensive example of creating a production-ready MCP server.
 
-## Features
+<details>
+<summary><strong>Table of Contents</strong></summary>
+
+- [Features](#features)
+- [Example Interactions](#example-interactions-click-the-dropdowns-to-see-responses)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Usage Examples](#usage-examples)
+- [Available Tools](#available-tools)
+- [Data Source](#data-source)
+- [Troubleshooting](#troubleshooting)
+- [Technical Details](#technical-details)
+- [Project Structure](#project-structure)
+- [Deployment Options](#deployment-options)
+- [Using the MCP Server](#using-the-mcp-server)
+- [Testing & Quality Assurance](#testing--quality-assurance)
+- [Available MCP Tools](#available-mcp-tools)
+
+</details>
+
+<details>
+<summary><strong>Additional Documentation</strong></summary>
+
+- [MCP Server Documentation](src/mcp_server/README.md) - Detailed server implementation guide
+- [Deployment Guide](deploy/README.md) - Docker and Kubernetes deployment instructions
+- [Database Schema](src/shared/README.md) - Data model and database documentation
+
+</details>
+
+<br>
+
+---
+# Features
 
 ### Intelligent Gaming Tools
 - **Natural Language Search**: Find games using natural queries like "chill puzzle games for tonight" or "games like Portal"
@@ -42,6 +74,8 @@ This repo was developed with Claude Code, and I left Claude's config in here for
 - **Smart Caching System**: Intelligent caching with configurable TTL for optimal performance
 - **Comprehensive Testing**: Full unit and integration test coverage with quality assurance
 - **Health Monitoring**: Built-in health checks, metrics, and administration tools
+
+<br>
 
 ## Example Interactions (Click the dropdowns to see responses)
 
@@ -63,14 +97,20 @@ This repo was developed with Claude Code, and I left Claude's config in here for
 <img src="images/game_sharing_calendar_answer.png" />
 </details>
 
-## Prerequisites
+<br>
+
+---
+# Prerequisites
 
 - Python 3.8 or higher
 - A Steam account with a public game library
 - Steam API key (get one from https://steamcommunity.com/dev/apikey)
 - Your Steam ID
 
-## Setup
+<br>
+
+---
+# Setup
 
 ### 1. Install Dependencies
 
@@ -120,7 +160,10 @@ You can also check the health endpoint:
 curl http://localhost:8000/health
 ```
 
-## Usage Examples
+<br>
+
+---
+# Usage Examples
 
 The intelligent MCP server can understand and respond to natural language queries like:
 
@@ -133,7 +176,10 @@ The intelligent MCP server can understand and respond to natural language querie
 
 The server uses context understanding and AI-powered analysis to provide intelligent, personalized responses.
 
-## Available Tools
+<br>
+
+---
+# Available Tools
 
 The server provides 5 comprehensive tools that leverage natural language processing and AI:
 
@@ -169,7 +215,10 @@ The server provides 5 comprehensive tools that leverage natural language process
 
 For detailed documentation on each tool's capabilities and parameters, see [MCP Server Documentation](src/mcp_server/README.md).
 
-## Data Source
+<br>
+
+---
+# Data Source
 
 The server uses a sophisticated relational SQLite database (`steam_library.db`) with normalized data structure:
 - **Games**: Comprehensive game metadata including ratings, reviews, genres, developers, publishers
@@ -180,7 +229,10 @@ The server uses a sophisticated relational SQLite database (`steam_library.db`) 
 
 The database is automatically created and managed by the fetcher script. For detailed schema information, see [Database Schema Documentation](src/shared/README.md).
 
-## Troubleshooting
+<br>
+
+---
+# Troubleshooting
 
 1. **Server not connecting**: Check that the server is running on the correct port
 2. **Database not found**: Run `python src/fetcher/steam_library_fetcher.py` to create the SQLite database
@@ -188,7 +240,10 @@ The database is automatically created and managed by the fetcher script. For det
 4. **No data returned**: Ensure you've run the fetcher and the database contains your Steam data
 5. **Multiple users**: Use `get_all_users` tool to see available users if queries ask for user selection
 
-## Technical Details
+<br>
+
+---
+# Technical Details
 
 ### Architecture & Framework
 - **FastMCP Integration**: Built with official MCP Python SDK for HTTP streaming
@@ -214,7 +269,10 @@ The database is automatically created and managed by the fetcher script. For det
 
 For detailed technical documentation, see [MCP Server Documentation](src/mcp_server/README.md).
 
-## Project Structure
+<br>
+
+---
+# Project Structure
 
 ```
 steam-librarian/
@@ -241,8 +299,9 @@ steam-librarian/
 │   ├── test_mcp_server.py       # Unit tests (52 test cases)
 │   └── test_integration.py      # Integration tests with server startup
 ├── deploy/                       # Deployment configurations
-│   ├── docker/                  # Docker configurations
-│   └── helm/                    # Kubernetes Helm charts
+│   ├── README.md                # Comprehensive deployment guide
+│   ├── docker/                  # Docker configurations and compose files
+│   └── helm/                    # Kubernetes Helm charts with values
 ├── Makefile                      # Development commands and testing
 ├── requirements.txt              # Python dependencies
 └── README.md                     # This file
@@ -254,44 +313,54 @@ steam-librarian/
 - **MCP Server**: Runs as a Deployment, provides MCP interface to Steam data
 - **Shared Storage**: SQLite database on persistent volume shared between services
 
-## Deployment Options
+<br>
 
-### Local Development
+---
+# Deployment Options
+
+Steam Librarian supports multiple deployment options for different environments and use cases. For comprehensive deployment instructions, configuration options, and troubleshooting, see the **[Deployment Guide](deploy/README.md)**.
+
+### Quick Start Options
+
+#### Local Development
 ```bash
 # Run production server with full monitoring
 python src/mcp_server/run_server.py
 
 # Development mode with debug logging
 DEBUG=true LOG_LEVEL=DEBUG python src/mcp_server/run_server.py
-
-# Test the server
-make test-full
 ```
 
-### Docker
+#### Docker (Recommended)
 ```bash
 # Build and run with Docker Compose
 make build-docker
 make run-docker
 
-# Stop services
-make stop-docker
+# Check health and endpoints
+curl http://localhost:8000/health
+curl http://localhost:8000/metrics
 ```
 
-### Kubernetes with Helm
+#### Kubernetes with Helm
 ```bash
-# Create values override file
-cp deploy/helm/steam-librarian/values.yaml deploy/helm/steam-librarian/values-override.yaml
-# Edit values-override.yaml with your Steam credentials
-
-# Install with Helm
-helm install steam-librarian deploy/helm/steam-librarian -f deploy/helm/steam-librarian/values-override.yaml
-
-# Manual data fetch (since startup job was removed)
-kubectl create job --from=cronjob/steam-librarian-fetcher manual-fetch-$(date +%s)
+# Quick install with Helm
+helm install steam-librarian deploy/helm/steam-librarian -f values-override.yaml
 ```
 
-## Using the MCP Server
+For detailed instructions including:
+- Complete Docker Compose setup with environment configuration
+- Kubernetes deployment with custom values and scaling options  
+- Production deployment best practices
+- Health monitoring and troubleshooting
+- Manual data fetching and maintenance
+
+**👉 See the complete [Deployment Guide](deploy/README.md)**
+
+<br>
+
+---
+# Using the MCP Server
 
 This MCP server uses the Model Context Protocol, which requires an MCP client to interact with it. The server exposes tools that can be called by MCP clients such as:
 
@@ -302,6 +371,10 @@ This MCP server uses the Model Context Protocol, which requires an MCP client to
 The server runs on port 8000 by default with the following endpoints:
 - `http://0.0.0.0:8000/mcp` - MCP protocol endpoint (HTTP transport with SSE)
 - `http://0.0.0.0:8000/health` - Health check endpoint for monitoring
+
+<br>
+
+---
 
 ### Testing & Quality Assurance
 
@@ -323,6 +396,10 @@ make test-full
 # Run complete code quality checks + all tests
 make check-full
 ```
+
+<br>
+
+---
 
 ### Available MCP Tools
 
