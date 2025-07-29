@@ -154,7 +154,7 @@ try:
     register_tools(mcp)
 
     # Import resources and prompts to register their decorators
-    from . import resources, prompts
+    from . import prompts, resources  # noqa: F401
 
     logger.info("Steam Librarian MCP Server tools, resources, and prompts registered successfully")
 
