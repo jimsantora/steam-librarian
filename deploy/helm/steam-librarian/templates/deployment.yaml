@@ -64,6 +64,8 @@ spec:
             secretKeyRef:
               name: {{ include "steam-librarian.secretName" . }}
               key: {{ .Values.steam.existingSecretKeys.steamId }}
+        - name: FASTMCP_HOST
+          value: "0.0.0.0"
         volumeMounts:
         - name: data
           mountPath: /data
