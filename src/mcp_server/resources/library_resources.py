@@ -46,7 +46,7 @@ async def library_overview() -> str:
 def game_details(app_id: str) -> str:
     """Deep dive into any game - details, reviews, and your personal history"""
     import asyncio
-    
+
     if not app_id.isdigit():
         error = {"error": True, "error_type": "VALIDATION_ERROR", "message": "Invalid app_id format"}
         return json.dumps(error, indent=2)
@@ -73,7 +73,7 @@ def game_details(app_id: str) -> str:
         await cache.set(cache_key, details_json, ttl=3600)  # 1 hour
 
         return details_json
-    
+
     # Get or create event loop and run async function
     try:
         loop = asyncio.get_event_loop()
@@ -120,7 +120,7 @@ async def recent_activity() -> str:
 def games_by_genre(genre_name: str) -> str:
     """All games in your library for a specific genre"""
     import asyncio
-    
+
     async def _get_games_by_genre():
         user_context = await resolve_user_context()
         if "error" in user_context:
@@ -147,7 +147,7 @@ def games_by_genre(genre_name: str) -> str:
         await cache.set(cache_key, result_json, ttl=1800)  # 30 minutes
 
         return result_json
-    
+
     # Get or create event loop and run async function
     try:
         loop = asyncio.get_event_loop()
