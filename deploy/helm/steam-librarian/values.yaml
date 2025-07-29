@@ -41,8 +41,8 @@ fetcher:
   cacheDays: 7
   
   # Additional arguments for the fetcher
-  extraArgs: []
-  # - "--friends"
+  extraArgs:
+    - "--friends"
   # - "--force-refresh"
   
   # Resources
