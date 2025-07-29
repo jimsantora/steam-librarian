@@ -80,6 +80,7 @@ def game_details(app_id: str) -> str:
         if loop.is_running():
             # We're in an async context, need to create a new task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(asyncio.run, _get_game_details())
                 return future.result()
@@ -154,6 +155,7 @@ def games_by_genre(genre_name: str) -> str:
         if loop.is_running():
             # We're in an async context, need to create a new task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(asyncio.run, _get_games_by_genre())
                 return future.result()
