@@ -14,8 +14,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
-COPY src/fetcher /app/fetcher
-COPY src/shared /app/shared
+COPY src/ /app/src/
 
 # Create directory for database volume
 RUN mkdir -p /data
@@ -25,8 +24,8 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 # Default environment variables (can be overridden)
-ENV DB_PATH=/data/steam_library.db
+ENV DATABASE_URL=sqlite:////data/steam_library.db
 ENV CACHE_DAYS=7
 
 # Run the fetcher
-CMD ["python", "fetcher/steam_library_fetcher.py"]
+CMD ["python", "src/fetcher/steam_library_fetcher.py"]

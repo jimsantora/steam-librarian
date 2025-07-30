@@ -5,7 +5,7 @@
 <h1 align="center">Steam Librarian</h1>
 
 <p align="center">
-  <em><strong>Your personal game archivist and curator.</strong> They know your library inside and out, can compare collections with friends, suggest your next adventure, and share deep insights about every game on your digital shelves.</em>
+  <em><strong>Your Steam collection, curated by an AI-powered librarian.</strong> Natural language search, mood-based recommendations, and social insights that actually help you pick the perfect game.</em>
 </p>
 
 <p align="center">
@@ -16,22 +16,64 @@
   <a href="https://github.com/anthropics/mcp"><img src="https://img.shields.io/badge/MCP-Protocol-green" alt="MCP Protocol"></a>
 </p>
 
-A Model Context Protocol (MCP) server that provides access to your Steam library data via a streamable HTTP interface. It uses a SQLite database to store and efficiently query your Steam library data, including multi-user support for friends and social features. 
+Steam Librarian is your digital gaming archivist - an intelligent Model Context Protocol (MCP) server that transforms how you interact with your Steam library. Our core philosophy addresses a universal gamer problem: extensive libraries filled with unplayed gems, forgotten favorites, and impulse purchases create decision paralysis where we spend more time browsing than playing. Like a knowledgeable librarian who knows every book on the shelf, Steam Librarian analyzes your gaming patterns, respects your time, and serves as your personal curator.
 
-This repo was developed with Claude Code, and I left Claude's config in here for reference. This was built simply as a learning experience and an example of how to create an MCP server. 
+This dedicated record keeper tracks your play history and preferences, helps you find games that match your current mood and available time, understands what your friends are playing, and can suggest the perfect game for any situation. Built with FastMCP and featuring HTTP streaming, smart caching, comprehensive testing, and production-ready architecture, it serves as both a practical gaming tool and a comprehensive example of creating an intelligent MCP server.
 
-## Features
+<details>
+<summary><strong>Table of Contents</strong></summary>
 
-- **Search Games**: Find games by name, genre, developer, publisher, review summary, or maturity rating
-- **Filter Games**: Filter by playtime, review summary, or maturity rating  
-- **Game Details**: Get comprehensive information about specific games
-- **Review Analysis**: Detailed review statistics for games
-- **Library Statistics**: Overview of your entire game library
-- **Recently Played**: See what you've been playing lately
-- **Recommendations**: Get game suggestions based on your playtime patterns
-- **Multi-User Support**: Query multiple Steam users and their libraries
-- **Friends & Social**: Access friends lists, common games, and social features
-- **User Profiles**: Get comprehensive user profile data including Steam level and XP
+- [Features](#features)
+- [Example Interactions](#example-interactions-click-the-dropdowns-to-see-responses)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Usage Examples](#usage-examples)
+- [Available Tools](#available-tools)
+- [Data Source](#data-source)
+- [Troubleshooting](#troubleshooting)
+- [Technical Details](#technical-details)
+- [Project Structure](#project-structure)
+- [Deployment Options](#deployment-options)
+- [Using the MCP Server](#using-the-mcp-server)
+- [Testing & Quality Assurance](#testing--quality-assurance)
+- [Available MCP Tools](#available-mcp-tools)
+
+</details>
+
+<details>
+<summary><strong>Additional Documentation</strong></summary>
+
+- [MCP Server Documentation](src/mcp_server/README.md) - Detailed server implementation guide
+- [Deployment Guide](deploy/README.md) - Docker and Kubernetes deployment instructions
+- [Database Schema](src/shared/README.md) - Data model and database documentation
+
+</details>
+
+<br>
+
+---
+# Features
+
+### Intelligent Gaming Tools
+- **Natural Language Search**: Find games using natural queries like "chill puzzle games for tonight" or "games like Portal"
+- **AI-Powered Recommendations**: Get personalized suggestions based on your gaming patterns, mood, and available time
+- **Smart Filtering**: Use intelligent presets (comfort_food, hidden_gems, quick_session, deep_dive) or custom criteria
+- **Social Gaming Analytics**: Discover friends' libraries, find common games, and calculate compatibility scores
+- **Comprehensive Library Insights**: Deep analytics with AI-generated gaming insights and trend analysis
+
+### Core Functionality
+- **Multi-User Support**: Query multiple Steam users and seamlessly switch between libraries
+- **Game Details & Reviews**: Comprehensive information including review statistics and ratings
+- **Recent Activity Tracking**: Monitor what you and your friends have been playing
+- **User Profile Data**: Access Steam levels, XP, account age, and profile information
+
+### Technical Excellence
+- **Production-Ready Architecture**: Built with FastMCP, HTTP streaming, and comprehensive error handling
+- **Smart Caching System**: Intelligent caching with configurable TTL for optimal performance
+- **Comprehensive Testing**: Full unit and integration test coverage with quality assurance
+- **Health Monitoring**: Built-in health checks, metrics, and administration tools
+
+<br>
 
 ## Example Interactions (Click the dropdowns to see responses)
 
@@ -53,14 +95,20 @@ This repo was developed with Claude Code, and I left Claude's config in here for
 <img src="images/game_sharing_calendar_answer.png" />
 </details>
 
-## Prerequisites
+<br>
+
+---
+# Prerequisites
 
 - Python 3.8 or higher
 - A Steam account with a public game library
 - Steam API key (get one from https://steamcommunity.com/dev/apikey)
 - Your Steam ID
 
-## Setup
+<br>
+
+---
+# Setup
 
 ### 1. Install Dependencies
 
@@ -93,13 +141,13 @@ python src/fetcher/steam_library_fetcher.py --friends
 
 ### 3. Run the MCP Server
 
-Start the HTTP server:
+Start the production server:
 
 ```bash
-python src/mcp_server/mcp_server.py
+python src/mcp_server/run_server.py
 ```
 
-The server will start on `http://0.0.0.0:8000/mcp`.
+The server will start on `http://0.0.0.0:8000/mcp` with comprehensive health checks and monitoring.
 
 ### 4. Verify the Server is Running
 
@@ -110,43 +158,79 @@ You can also check the health endpoint:
 curl http://localhost:8000/health
 ```
 
-## Usage Examples
+<br>
 
-The MCP server provides tools that can answer questions like:
+---
+# Usage Examples
 
-- "What are my top 10 most played games?"
-- "Show me all my puzzle games" 
-- "Find games with 'Very Positive' reviews that I haven't played yet"
-- "What are some good games I should try based on what I've played?"
-- "Show me details for Half-Life 2"
-- "What games have I played recently?"
-- "Give me statistics about my Steam library"
+The intelligent MCP server can understand and respond to natural language queries like:
 
-## Available Tools
+- **Natural Language Search**: "Show me chill puzzle games for tonight" or "Find games like Portal that I haven't played"  
+- **Smart Recommendations**: "Suggest games based on my recent activity" or "What should I play with friends?"
+- **Social Gaming**: "Which friends own Helldivers 2?" or "Show me games I have in common with Sarah"
+- **Library Analytics**: "Analyze my gaming patterns" or "What genres do I play most?"
+- **Activity Tracking**: "What have I been playing lately?" or "Show me my most played games"
+- **Game Information**: "Tell me about Baldur's Gate 3" or "What are the reviews for this indie game?"
 
-1. **get_all_users**: List all available user profiles in the database
-2. **get_user_info**: Get comprehensive user profile including Steam level and account details
-3. **search_games**: Search by name, genre, developer, publisher, review summary, or maturity rating
-4. **filter_games**: Filter by playtime thresholds, review summary, or maturity rating
-5. **get_game_details**: Get comprehensive info about a specific game
-6. **get_game_reviews**: Get detailed review statistics
-7. **get_library_stats**: Overview statistics of your library
-8. **get_recently_played**: Games played in the last 2 weeks
-9. **get_recommendations**: Personalized suggestions based on your playtime
-10. **get_friends_data**: Access friends lists, common games, and social features
+The server uses context understanding and AI-powered analysis to provide intelligent, personalized responses.
 
-## Data Source
+<br>
 
-The server uses a SQLite database (`steam_library.db`) with the following structure:
-- **Games**: Game details, ratings, reviews, genres, developers, publishers
-- **User Profiles**: Steam user information, levels, XP, location data
-- **User Games**: Per-user playtime and ownership data
-- **Friends**: Social relationships and friend data
-- **Reviews**: Detailed review statistics and summaries
+---
+# Available Tools
 
-The database is automatically created and managed by the fetcher script.
+The server provides 5 comprehensive tools that leverage natural language processing and AI:
 
-## Troubleshooting
+### **search_games** - Natural Language Game Search
+- **Natural Language Processing**: Understands queries like "chill puzzle games" or "games like Portal"
+- **Mood Detection**: Recognizes gaming moods (chill, intense, creative, social, nostalgic)
+- **Context Awareness**: Handles time constraints ("quick games") and playtime preferences
+- **Smart Matching**: Finds similar games and handles partial/fuzzy matching
+
+### **filter_games** - Advanced Filtering with Intelligent Presets  
+- **Smart Presets**: `comfort_food` (highly-rated 5+ hour games), `hidden_gems` (positive <2 hour games)
+- **Custom Filtering**: Playtime ranges, review ratings, categories, maturity ratings
+- **Intelligent Sorting**: Multiple sort options with relevance scoring
+
+### **get_recommendations** - AI-Powered Personalized Recommendations
+- **Context-Aware**: Considers mood, available time, and gaming preferences
+- **Algorithmic Intelligence**: Genre preferences, developer affinity, playtime patterns
+- **Personalization**: Adapts to your unique gaming history and preferences
+
+### **get_friends_data** - Social Gaming Analytics
+- **Common Games Discovery**: Find games you share with friends
+- **Compatibility Scoring**: AI-powered compatibility analysis based on genres and games
+- **Activity Tracking**: Monitor friends' recent gaming activity
+- **Multiplayer Matching**: Find friends who own specific multiplayer games
+
+### **get_library_stats** - Comprehensive Library Analytics
+- **Deep Analytics**: Playtime distribution, genre preferences, developer loyalty
+- **AI-Generated Insights**: Smart observations about your gaming patterns
+- **Trend Analysis**: Activity patterns and gaming behavior over time
+- **Value Analysis**: Identify your highest-value games and spending efficiency
+
+**Additional Utility Tools**: `get_all_users`, `get_user_info`, `get_game_details`, `get_game_reviews`, `get_recently_played`
+
+For detailed documentation on each tool's capabilities and parameters, see [MCP Server Documentation](src/mcp_server/README.md).
+
+<br>
+
+---
+# Data Source
+
+The server uses a sophisticated relational SQLite database (`steam_library.db`) with normalized data structure:
+- **Games**: Comprehensive game metadata including ratings, reviews, genres, developers, publishers
+- **User Profiles**: Complete Steam user information, levels, XP, location data, account details
+- **User Games**: Per-user playtime and ownership data with recent activity tracking
+- **Friends**: Social relationships and friend networks for compatibility analysis
+- **Reviews**: Detailed review statistics and sentiment analysis
+
+The database is automatically created and managed by the fetcher script. For detailed schema information, see [Database Schema Documentation](src/shared/README.md).
+
+<br>
+
+---
+# Troubleshooting
 
 1. **Server not connecting**: Check that the server is running on the correct port
 2. **Database not found**: Run `python src/fetcher/steam_library_fetcher.py` to create the SQLite database
@@ -154,41 +238,71 @@ The database is automatically created and managed by the fetcher script.
 4. **No data returned**: Ensure you've run the fetcher and the database contains your Steam data
 5. **Multiple users**: Use `get_all_users` tool to see available users if queries ask for user selection
 
-## Technical Details
+<br>
 
-- Built using FastMCP (official MCP Python SDK)
-- Uses HTTP transport with streamable responses
-- SQLAlchemy ORM with SQLite database for efficient data storage and querying
-- Multi-user support with proper relational data modeling
-- Comprehensive Steam API integration for fetching library and profile data
-- RESTful API endpoints for MCP tool invocation
+---
+# Technical Details
 
-## Project Structure
+### Architecture & Framework
+- **FastMCP Integration**: Built with official MCP Python SDK for HTTP streaming
+- **Production-Ready**: Comprehensive error handling, graceful shutdown, and signal management
+- **Smart Caching**: Intelligent memory-based caching with configurable TTL and automatic invalidation
+- **Multi-User Context**: Seamless user resolution with intelligent fallbacks
+
+### Database & Performance  
+- **SQLAlchemy ORM**: Efficient data modeling with proper relationships and indexing
+- **SQLite Database**: Normalized relational structure for optimal query performance
+- **Connection Pooling**: Configurable database pool management for scalability
+
+### Testing & Quality Assurance
+- **Comprehensive Test Suite**: 52+ unit tests and integration tests with 100% pass rate
+- **Automated Quality Checks**: Linting (ruff), formatting (black), and code quality validation
+- **CI/CD Ready**: Make targets for development workflow and continuous integration
+- **Performance Testing**: Load testing and optimization validation
+
+### Monitoring & Operations
+- **Health Monitoring**: Built-in health checks, metrics collection, and component status
+- **Administration Tools**: Monitoring script, configuration validation, and system diagnostics
+- **RESTful Endpoints**: Health checks (`/health`), detailed status (`/health/detailed`), metrics (`/metrics`)
+
+For detailed technical documentation, see [MCP Server Documentation](src/mcp_server/README.md).
+
+<br>
+
+---
+# Project Structure
 
 ```
 steam-librarian/
-├── src/                      # Source code
-│   ├── fetcher/             # Steam library data fetcher service
+├── src/                           # Source code
+│   ├── fetcher/                  # Steam library data fetcher service
 │   │   └── steam_library_fetcher.py
-│   ├── mcp_server/          # MCP server service
-│   │   └── mcp_server.py
-│   └── shared/              # Shared code between services
-│       └── database.py      # SQLAlchemy models and DB utilities
-├── deploy/                  # Deployment configurations
-│   ├── docker/             # Docker configurations
-│   │   ├── Dockerfile.fetcher
-│   │   ├── Dockerfile.mcp_server
-│   │   └── docker-compose.yml
-│   └── helm/               # Helm charts
-│       └── steam-librarian/
-│           ├── Chart.yaml
-│           ├── values.yaml
-│           └── templates/
-├── docs/                   # Documentation
-├── images/                 # Images and assets
-├── requirements.txt        # Python dependencies
-├── .env.example           # Environment variables template
-└── README.md              # Main project documentation
+│   ├── mcp_server/               # Advanced MCP server with FastMCP
+│   │   ├── server.py            # Main FastMCP server with health endpoints
+│   │   ├── config.py            # Configuration management system
+│   │   ├── cache.py             # Smart caching with TTL
+│   │   ├── run_server.py        # Production startup script
+│   │   ├── monitor.py           # Administration and monitoring tool
+│   │   ├── tools/               # 5 comprehensive MCP tools
+│   │   │   ├── search_games.py      # Natural language search
+│   │   │   ├── filter_games.py      # Smart filtering with presets
+│   │   │   ├── get_recommendations.py  # AI-powered recommendations
+│   │   │   ├── get_friends_data.py     # Social gaming analytics
+│   │   │   └── get_library_stats.py    # Comprehensive insights
+│   │   └── utils/               # Utility functions and helpers
+│   └── shared/                   # Shared database and utilities
+│       ├── database.py          # SQLAlchemy models and DB utilities
+│       └── README.md            # Database schema documentation
+├── tests/                        # Comprehensive test suite
+│   ├── test_mcp_server.py       # Unit tests (52 test cases)
+│   └── test_integration.py      # Integration tests with server startup
+├── deploy/                       # Deployment configurations
+│   ├── README.md                # Comprehensive deployment guide
+│   ├── docker/                  # Docker configurations and compose files
+│   └── helm/                    # Kubernetes Helm charts with values
+├── Makefile                      # Development commands and testing
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
 
 ### Service Architecture
@@ -197,38 +311,54 @@ steam-librarian/
 - **MCP Server**: Runs as a Deployment, provides MCP interface to Steam data
 - **Shared Storage**: SQLite database on persistent volume shared between services
 
-## Deployment Options
+<br>
 
-### Local Development
+---
+# Deployment Options
+
+Steam Librarian supports multiple deployment options for different environments and use cases. For comprehensive deployment instructions, configuration options, and troubleshooting, see the **[Deployment Guide](deploy/README.md)**.
+
+### Quick Start Options
+
+#### Local Development
 ```bash
-# Run directly with Python
-python src/mcp_server/mcp_server.py
+# Run production server with full monitoring
+python src/mcp_server/run_server.py
+
+# Development mode with debug logging
+DEBUG=true LOG_LEVEL=DEBUG python src/mcp_server/run_server.py
 ```
 
-### Docker
+#### Docker (Recommended)
 ```bash
 # Build and run with Docker Compose
 make build-docker
 make run-docker
 
-# Stop services
-make stop-docker
+# Check health and endpoints
+curl http://localhost:8000/health
+curl http://localhost:8000/metrics
 ```
 
-### Kubernetes with Helm
+#### Kubernetes with Helm
 ```bash
-# Create values override file
-cp deploy/helm/steam-librarian/values.yaml deploy/helm/steam-librarian/values-override.yaml
-# Edit values-override.yaml with your Steam credentials
-
-# Install with Helm
-helm install steam-librarian deploy/helm/steam-librarian -f deploy/helm/steam-librarian/values-override.yaml
-
-# Manual data fetch (since startup job was removed)
-kubectl create job --from=cronjob/steam-librarian-fetcher manual-fetch-$(date +%s)
+# Quick install with Helm
+helm install steam-librarian deploy/helm/steam-librarian -f values-override.yaml
 ```
 
-## Using the MCP Server
+For detailed instructions including:
+- Complete Docker Compose setup with environment configuration
+- Kubernetes deployment with custom values and scaling options  
+- Production deployment best practices
+- Health monitoring and troubleshooting
+- Manual data fetching and maintenance
+
+**👉 See the complete [Deployment Guide](deploy/README.md)**
+
+<br>
+
+---
+# Using the MCP Server
 
 This MCP server uses the Model Context Protocol, which requires an MCP client to interact with it. The server exposes tools that can be called by MCP clients such as:
 
@@ -240,16 +370,51 @@ The server runs on port 8000 by default with the following endpoints:
 - `http://0.0.0.0:8000/mcp` - MCP protocol endpoint (HTTP transport with SSE)
 - `http://0.0.0.0:8000/health` - Health check endpoint for monitoring
 
+<br>
+
+---
+
+### Testing & Quality Assurance
+
+The project includes comprehensive testing capabilities:
+
+```bash
+# Run basic import tests (fastest)
+make test
+
+# Run unit tests (52 test cases with detailed output)
+make test-unit
+
+# Run integration tests with server startup
+make test-integration
+
+# Run all tests (unit + integration)
+make test-full
+
+# Run complete code quality checks + all tests
+make check-full
+```
+
+<br>
+
+---
+
 ### Available MCP Tools
 
-The server exposes these tools through the MCP protocol:
+The server exposes these intelligent tools through the MCP protocol:
+
+**Advanced Intelligence Tools:**
+- `search_games` - Natural language search with mood detection and context understanding
+- `filter_games` - Smart filtering with intelligent presets and custom criteria  
+- `get_recommendations` - AI-powered personalized recommendations with context awareness
+- `get_friends_data` - Social gaming analytics with compatibility scoring
+- `get_library_stats` - Comprehensive library insights with AI-generated analysis
+
+**Utility Tools:**
 - `get_all_users` - List all Steam users in the database
-- `search_games` - Search games by name, genre, developer, etc.
-- `filter_games` - Filter games by playtime, reviews, or rating
-- `get_game_details` - Get detailed information about a specific game
-- `get_game_reviews` - Get review statistics for a game
-- `get_library_stats` - Get overall library statistics
-- `get_recently_played` - Get recently played games
-- `get_recommendations` - Get personalized game recommendations
-- `get_user_info` - Get user profile information
-- `get_friends_data` - Get friends and social data
+- `get_user_info` - Get comprehensive user profile information  
+- `get_game_details` - Get detailed information about specific games
+- `get_game_reviews` - Get review statistics and ratings
+- `get_recently_played` - Get recently played games with activity tracking
+
+For detailed tool documentation and examples, see [MCP Server Documentation](src/mcp_server/README.md).

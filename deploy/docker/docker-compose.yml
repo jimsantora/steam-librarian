@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Steam Library Fetcher - runs periodically to update data
   fetcher:
@@ -9,12 +7,12 @@ services:
     environment:
       - STEAM_ID=${STEAM_ID}
       - STEAM_API_KEY=${STEAM_API_KEY}
-      - DB_PATH=/data/steam_library.db
+      - DATABASE_URL=sqlite:////data/steam_library.db
       - CACHE_DAYS=7
     volumes:
       - steam-data:/data
     restart: "no"
-    command: ["python", "fetcher/steam_library_fetcher.py"]
+    command: ["python", "src/fetcher/steam_library_fetcher.py"]
 
   # MCP Server - provides the MCP interface
   mcp-server:
@@ -22,7 +20,13 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.mcp_server
     environment:
-      - DB_PATH=/data/steam_library.db
+      - DATABASE_URL=sqlite:////data/steam_library.db
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - ENABLE_CACHE=true
+      - CACHE_TTL=3600
       - STEAM_ID=${STEAM_ID}  # Optional fallback
     volumes:
       - steam-data:/data
@@ -46,7 +50,7 @@ services:
     environment:
       - STEAM_ID=${STEAM_ID}
       - STEAM_API_KEY=${STEAM_API_KEY}
-      - DB_PATH=/data/steam_library.db
+      - DATABASE_URL=sqlite:////data/steam_library.db
       - CACHE_DAYS=7
     volumes:
       - steam-data:/data
@@ -56,7 +60,7 @@ services:
       - |
         while true; do
           echo "Running Steam Library Fetcher at $$(date)"
-          python fetcher/steam_library_fetcher.py
+          python src/fetcher/steam_library_fetcher.py
           echo "Fetcher completed. Sleeping for 24 hours..."
           sleep 86400
         done

@@ -48,8 +48,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "steam-librarian.secretName" . }}
                   key: {{ .Values.steam.existingSecretKeys.apiKey }}
-            - name: DB_PATH
-              value: "/data/steam_library.db"
+            - name: DATABASE_URL
+              value: "sqlite:////data/steam_library.db"
             - name: CACHE_DAYS
               value: {{ .Values.fetcher.cacheDays | quote }}
             volumeMounts:

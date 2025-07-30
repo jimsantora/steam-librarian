@@ -29,13 +29,19 @@ docker-compose up -d
 This will:
 - Build both the fetcher and MCP server images
 - Run the fetcher once to populate the database
-- Start the MCP server on port 8000
+- Start the MCP server with FastMCP HTTP streaming on port 8000
 - Run a cron-like fetcher that updates daily
+- Set up health checks and monitoring endpoints
 
 ### Docker Services
 
 - **fetcher**: Runs once to populate initial data
-- **mcp-server**: The MCP API server (port 8000)
+- **mcp-server**: The FastMCP HTTP streaming server with comprehensive tools (port 8000)
+  - Natural language game search
+  - AI-powered recommendations  
+  - Social gaming analytics
+  - Library statistics and insights
+  - Health monitoring endpoints (`/health`, `/metrics`, `/config`)
 - **fetcher-cron**: Runs daily to update data
 
 ### Managing Services
@@ -45,6 +51,14 @@ This will:
 docker-compose logs -f mcp-server
 docker-compose logs -f fetcher-cron
 
+# Check server health
+curl http://localhost:8000/health
+curl http://localhost:8000/health/detailed
+
+# View server metrics and configuration
+curl http://localhost:8000/metrics
+curl http://localhost:8000/config
+
 # Stop services
 docker-compose down
 
@@ -52,7 +66,10 @@ docker-compose down
 docker-compose down -v
 ```
 
-## Kubernetes Deployment (Helm)
+<br>
+
+---
+# Kubernetes Deployment (Helm)
 
 ### Prerequisites
 - Kubernetes cluster (k3s, minikube, etc.)
@@ -185,7 +202,10 @@ helm uninstall steam-librarian
 2. **Job Failures**: Check fetcher logs with `kubectl logs job/steam-librarian-fetcher-startup`
 3. **Database Access**: Both services must mount the same PVC at `/data`
 
-## Building Images
+<br>
+
+---
+# Building Images
 
 ### Build Locally
 ```bash

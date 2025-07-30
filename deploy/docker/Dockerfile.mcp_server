@@ -15,8 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
-COPY src/mcp_server /app/mcp_server
-COPY src/shared /app/shared
+COPY src/ /app/src/
 
 # Create directory for database volume
 RUN mkdir -p /data
@@ -26,10 +25,18 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 # Default environment variables (can be overridden)
-ENV DB_PATH=/data/steam_library.db
+ENV DATABASE_URL=sqlite:////data/steam_library.db
+ENV HOST=0.0.0.0
+ENV PORT=8000
+ENV DEBUG=false
+ENV LOG_LEVEL=INFO
 
 # Expose port for HTTP transport
 EXPOSE 8000
 
-# Run the MCP server
-CMD ["python", "mcp_server/mcp_server.py"]
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+# Run the MCP server using the production startup script
+CMD ["python", "src/mcp_server/run_server.py"]
