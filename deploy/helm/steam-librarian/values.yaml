@@ -121,12 +121,13 @@ mcpServer:
   
   # Pod security context
   podSecurityContext:
-    fsGroup: 2000
+    fsGroup: 65534  # nogroup
   
   # Container security context
   securityContext:
     runAsNonRoot: true
-    runAsUser: 1000
+    runAsUser: 65534  # nobody user
+    runAsGroup: 65534  # nogroup
     readOnlyRootFilesystem: false
 
   # MCP Server Configuration

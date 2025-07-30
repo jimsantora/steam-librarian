@@ -17,12 +17,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ /app/src/
 
-# Create directory for database volume
-RUN mkdir -p /data
+# Create directories for database volume and cache
+RUN mkdir -p /data /app/cache && \
+    chown -R nobody:nogroup /app/cache && \
+    chmod 755 /app/cache
 
 # Set environment for Python
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+
+# Switch to nobody user
+USER nobody
 
 # Default environment variables (can be overridden)
 ENV DATABASE_URL=sqlite:////data/steam_library.db

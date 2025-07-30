@@ -30,6 +30,22 @@ spec:
       serviceAccountName: {{ include "steam-librarian.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.mcpServer.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.36
+        command: ['sh', '-c']
+        args:
+          - |
+            echo "Setting ownership of /data to nobody:nogroup (65534:65534)"
+            chown -R 65534:65534 /data
+            chmod -R 755 /data
+            echo "Permissions fixed"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        securityContext:
+          runAsUser: 0  # Run as root to change ownership
+          runAsNonRoot: false
       containers:
       - name: mcp-server
         securityContext:
