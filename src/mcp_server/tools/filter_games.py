@@ -130,11 +130,11 @@ def _get_preset_conditions(preset: str) -> list:
 
     if preset == "comfort_food":
         # Highly rated games with decent playtime (5+ hours)
-        return [UserGame.playtime_forever >= 300, or_(Game.reviews.has(GameReview.review_summary.in_(["Very Positive", "Overwhelmingly Positive"])), Game.reviews.has(GameReview.positive_percentage >= 85))]  # 5+ hours
+        return [UserGame.playtime_forever >= 300, or_(Game.reviews.has(GameReview.review_summary.in_(["Very Positive", "Overwhelmingly Positive"])), Game.reviews.has(and_(GameReview.total_reviews > 0, (GameReview.positive_reviews * 100.0 / GameReview.total_reviews) >= 85)))]  # 5+ hours
 
     elif preset == "hidden_gems":
         # Positive games with minimal playtime (under 2 hours)
-        return [UserGame.playtime_forever < 120, UserGame.playtime_forever > 0, or_(Game.reviews.has(GameReview.review_summary.in_(["Positive", "Very Positive", "Mostly Positive"])), Game.reviews.has(GameReview.positive_percentage >= 70))]  # Under 2 hours  # But some playtime
+        return [UserGame.playtime_forever < 120, UserGame.playtime_forever > 0, or_(Game.reviews.has(GameReview.review_summary.in_(["Positive", "Very Positive", "Mostly Positive"])), Game.reviews.has(and_(GameReview.total_reviews > 0, (GameReview.positive_reviews * 100.0 / GameReview.total_reviews) >= 70)))]  # Under 2 hours  # But some playtime
 
     elif preset == "quick_session":
         # Games perfect for short sessions (under 1 hour total playtime)

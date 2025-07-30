@@ -52,7 +52,7 @@ async def get_library_stats(user_steam_id: str | None = None, time_period: str =
         return "Unable to generate library statistics. Make sure you have games in your library."
 
     # Format response
-    stats_text = _format_library_stats(stats, user, input_data.time_period, input_data.include_insights)
+    stats_text = _format_library_stats(stats, input_data.time_period, input_data.include_insights)
 
     return stats_text
 

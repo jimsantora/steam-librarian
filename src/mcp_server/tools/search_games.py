@@ -86,7 +86,7 @@ async def _perform_enhanced_search(user, query: str) -> list[dict[str, Any]]:
         scored_games = []
         for ug in user_games:
             if ug.game:
-                score = _calculate_search_score(ug, search_intent)
+                score = _calculate_search_score(ug, search_intent, user_games)
                 if score > 0.1:  # Minimum relevance threshold
                     scored_games.append({"app_id": ug.game.app_id, "name": ug.game.name, "playtime_hours": round(ug.playtime_forever / 60, 1), "recent_playtime_hours": round(ug.playtime_2weeks / 60, 1), "genres": [g.genre_name for g in ug.game.genres] if ug.game.genres else [], "categories": [c.category_name for c in ug.game.categories] if ug.game.categories else [], "developers": [d.developer_name for d in ug.game.developers] if ug.game.developers else [], "score": score, "match_reasons": _generate_match_reasons(ug.game, search_intent), "review_data": {"summary": ug.game.reviews.review_summary, "positive_percentage": ug.game.reviews.positive_percentage} if ug.game.reviews else None})
 
@@ -157,13 +157,29 @@ def parse_enhanced_intent(query: str) -> dict[str, Any]:
     return intent
 
 
-def _calculate_search_score(user_game, search_intent: dict[str, Any]) -> float:
+def _calculate_search_score(user_game, search_intent: dict[str, Any], all_user_games) -> float:
     """Calculate relevance score for a game based on search intent"""
 
     score = 0.0
     game = user_game.game
 
-    # Text matching (40% of score)
+    # Similarity matching (highest priority for "like X" queries)
+    if search_intent["similarity_target"]:
+        # For similarity queries, prioritize games with matching characteristics
+        similarity_score = _calculate_similarity_score(game, search_intent["similarity_target"], all_user_games)
+        score += similarity_score * 0.6  # 60% weight for similarity
+
+        # Reduce weight of other factors for similarity queries
+        text_weight = 0.1
+        genre_weight = 0.2
+        mood_weight = 0.1
+    else:
+        # Normal weighting for non-similarity queries
+        text_weight = 0.4
+        genre_weight = 0.3
+        mood_weight = 0.2
+
+    # Text matching
     if search_intent["text_terms"]:
         text_score = 0.0
         game_text = f"{game.name} {' '.join([g.genre_name for g in game.genres])} {' '.join([d.developer_name for d in game.developers])}".lower()
@@ -172,19 +188,19 @@ def _calculate_search_score(user_game, search_intent: dict[str, Any]) -> float:
             if term in game_text:
                 text_score += 1.0 / len(search_intent["text_terms"])
 
-        score += text_score * 0.4
+        score += text_score * text_weight
 
-    # Genre matching (30% of score)
+    # Genre matching
     if search_intent["genres"] and game.genres:
         genre_names = [g.genre_name.lower() for g in game.genres]
         genre_matches = sum(1 for genre in search_intent["genres"] if genre.lower() in genre_names)
         genre_score = genre_matches / len(search_intent["genres"])
-        score += genre_score * 0.3
+        score += genre_score * genre_weight
 
-    # Mood matching (20% of score)
+    # Mood matching
     if search_intent["moods"]:
         mood_score = _calculate_mood_score(game, search_intent["moods"])
-        score += mood_score * 0.2
+        score += mood_score * mood_weight
 
     # Time constraint matching (10% of score)
     if search_intent["time_constraints"]:
@@ -192,6 +208,65 @@ def _calculate_search_score(user_game, search_intent: dict[str, Any]) -> float:
         score += time_score * 0.1
 
     return min(score, 1.0)  # Cap at 1.0
+
+
+def _calculate_similarity_score(game, target_name: str, all_user_games) -> float:
+    """Calculate similarity score based on actual game characteristics from user's library"""
+
+    # Find the target game in user's library
+    target_game = None
+    target_name_lower = target_name.lower()
+
+    for ug in all_user_games:
+        if ug.game and target_name_lower in ug.game.name.lower():
+            target_game = ug.game
+            break
+
+    if not target_game:
+        # Target game not found in library
+        return 0.0
+
+    # Don't match the game with itself
+    if game.app_id == target_game.app_id:
+        return 0.0
+
+    score = 0.0
+
+    # Genre matching (50% of similarity score)
+    if game.genres and target_game.genres:
+        game_genres = {g.genre_name for g in game.genres}
+        target_genres = {g.genre_name for g in target_game.genres}
+
+        # Calculate Jaccard similarity for genres
+        intersection = game_genres & target_genres
+        union = game_genres | target_genres
+
+        if union:
+            genre_score = len(intersection) / len(union)
+            score += genre_score * 0.5
+
+    # Category matching (30% of similarity score)
+    if game.categories and target_game.categories:
+        game_categories = {c.category_name for c in game.categories}
+        target_categories = {c.category_name for c in target_game.categories}
+
+        # Calculate Jaccard similarity for categories
+        intersection = game_categories & target_categories
+        union = game_categories | target_categories
+
+        if union:
+            category_score = len(intersection) / len(union)
+            score += category_score * 0.3
+
+    # Developer matching (20% of similarity score)
+    if game.developers and target_game.developers:
+        game_devs = {d.developer_name for d in game.developers}
+        target_devs = {d.developer_name for d in target_game.developers}
+
+        if game_devs & target_devs:
+            score += 0.2  # Same developer
+
+    return score
 
 
 def _calculate_mood_score(game, moods: list[str]) -> float:
