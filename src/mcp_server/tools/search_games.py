@@ -168,7 +168,7 @@ def _calculate_search_score(user_game, search_intent: dict[str, Any], all_user_g
         # For similarity queries, prioritize games with matching characteristics
         similarity_score = _calculate_similarity_score(game, search_intent["similarity_target"], all_user_games)
         score += similarity_score * 0.6  # 60% weight for similarity
-        
+
         # Reduce weight of other factors for similarity queries
         text_weight = 0.1
         genre_weight = 0.2
@@ -212,60 +212,60 @@ def _calculate_search_score(user_game, search_intent: dict[str, Any], all_user_g
 
 def _calculate_similarity_score(game, target_name: str, all_user_games) -> float:
     """Calculate similarity score based on actual game characteristics from user's library"""
-    
+
     # Find the target game in user's library
     target_game = None
     target_name_lower = target_name.lower()
-    
+
     for ug in all_user_games:
         if ug.game and target_name_lower in ug.game.name.lower():
             target_game = ug.game
             break
-    
+
     if not target_game:
         # Target game not found in library
         return 0.0
-    
+
     # Don't match the game with itself
     if game.app_id == target_game.app_id:
         return 0.0
-    
+
     score = 0.0
-    
+
     # Genre matching (50% of similarity score)
     if game.genres and target_game.genres:
         game_genres = {g.genre_name for g in game.genres}
         target_genres = {g.genre_name for g in target_game.genres}
-        
+
         # Calculate Jaccard similarity for genres
         intersection = game_genres & target_genres
         union = game_genres | target_genres
-        
+
         if union:
             genre_score = len(intersection) / len(union)
             score += genre_score * 0.5
-    
+
     # Category matching (30% of similarity score)
     if game.categories and target_game.categories:
         game_categories = {c.category_name for c in game.categories}
         target_categories = {c.category_name for c in target_game.categories}
-        
+
         # Calculate Jaccard similarity for categories
         intersection = game_categories & target_categories
         union = game_categories | target_categories
-        
+
         if union:
             category_score = len(intersection) / len(union)
             score += category_score * 0.3
-    
+
     # Developer matching (20% of similarity score)
     if game.developers and target_game.developers:
         game_devs = {d.developer_name for d in game.developers}
         target_devs = {d.developer_name for d in target_game.developers}
-        
+
         if game_devs & target_devs:
             score += 0.2  # Same developer
-    
+
     return score
 
 
