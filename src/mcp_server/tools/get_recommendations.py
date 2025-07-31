@@ -5,9 +5,14 @@ from collections import Counter
 from typing import Any
 
 from aiohttp import ClientSession
+from mcp.server.fastmcp import Context
 from sqlalchemy.orm import joinedload
 
 from mcp_server.cache import cache, user_cache_key
+from mcp_server.enhanced_user_context import (
+    format_elicitation_error,
+    resolve_user_context_with_elicitation,
+)
 from mcp_server.server import mcp
 from mcp_server.services.feature_extractor import FeatureExtractor
 from mcp_server.services.genre_translator import GenreTranslator
@@ -29,6 +34,7 @@ async def get_recommendations(
     features: list[str] | None = None,
     exclude_recent: bool = True,
     limit: int = 10,
+    ctx: Context | None = None,
 ) -> str:
     """Get personalized game recommendations based on your library and preferences.
 
@@ -48,10 +54,16 @@ async def get_recommendations(
         limit: Maximum number of recommendations (default: 10)
     """
 
-    # Resolve user context
-    user_context = await resolve_user_context(steam_id)
+    # Try enhanced user context resolution with elicitation if available
+    if ctx is not None:
+        user_context = await resolve_user_context_with_elicitation(steam_id, ctx, allow_elicitation=True)
+    else:
+        # Fallback to standard resolution
+        user_context = await resolve_user_context(steam_id)
+
     if "error" in user_context:
-        return f"User error: {user_context['message']}"
+        error_msg = format_elicitation_error(user_context) if ctx else user_context.get("message", "Unknown error")
+        return f"User error: {error_msg}"
 
     user = user_context["user"]
 

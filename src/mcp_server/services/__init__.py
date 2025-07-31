@@ -9,6 +9,7 @@ from .genre_translator import GenreTranslator
 from .mood_mapper import MoodMapper
 from .similarity_finder import SimilarityFinder
 from .time_normalizer import TimeNormalizer
+from .username_resolver import UsernameResolver
 
 __all__ = [
     "GenreTranslator",
@@ -16,4 +17,5 @@ __all__ = [
     "MoodMapper",
     "FeatureExtractor",
     "SimilarityFinder",
+    "UsernameResolver",
 ]

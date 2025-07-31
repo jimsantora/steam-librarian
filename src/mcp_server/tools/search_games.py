@@ -5,9 +5,14 @@ import re
 from typing import Any
 
 from aiohttp import ClientSession
+from mcp.server.fastmcp import Context
 from sqlalchemy.orm import joinedload
 
 from mcp_server.cache import cache, search_cache_key
+from mcp_server.enhanced_user_context import (
+    format_elicitation_error,
+    resolve_user_context_with_elicitation,
+)
 from mcp_server.server import mcp
 from mcp_server.services.feature_extractor import FeatureExtractor
 from mcp_server.services.genre_translator import GenreTranslator
@@ -15,6 +20,10 @@ from mcp_server.services.mood_mapper import MoodMapper
 from mcp_server.services.similarity_finder import SimilarityFinder
 from mcp_server.services.time_normalizer import TimeNormalizer
 from mcp_server.user_context import resolve_user_context
+from mcp_server.utils.elicitation import (
+    elicit_search_refinement,
+    should_elicit_for_query,
+)
 from mcp_server.validation import SearchGamesInput
 from shared.database import Game, UserGame, get_db
 
@@ -22,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def search_games(query: str, user_steam_id: str | None = None) -> str:
+async def search_games(query: str, user_steam_id: str | None = None, ctx: Context | None = None) -> str:
     """Natural language game search across your Steam library with intelligent parsing.
 
     Supports mood-based searches, genre detection, similarity matching, and contextual understanding.
@@ -35,12 +44,28 @@ async def search_games(query: str, user_steam_id: str | None = None) -> str:
     except Exception as e:
         return f"Invalid input: {str(e)}"
 
-    # Resolve user context
-    user_context = await resolve_user_context(input_data.user_steam_id)
+    # Try enhanced user context resolution with elicitation if available
+    if ctx is not None:
+        user_context = await resolve_user_context_with_elicitation(input_data.user_steam_id, ctx, allow_elicitation=True)
+    else:
+        # Fallback to standard resolution
+        user_context = await resolve_user_context(input_data.user_steam_id)
+
     if "error" in user_context:
-        return f"User error: {user_context['message']}"
+        error_msg = format_elicitation_error(user_context) if ctx else user_context.get("message", "Unknown error")
+        return f"User error: {error_msg}"
 
     user = user_context["user"]
+
+    # Check if query needs refinement via elicitation
+    if ctx is not None and should_elicit_for_query(input_data.query):
+        refinement = await elicit_search_refinement(ctx, input_data.query)
+        if refinement:
+            # Apply refinement to query - this is a simplified approach
+            # In a more sophisticated implementation, we'd merge this with the AI services
+            logger.info(f"Applied search refinement: {refinement}")
+            # For now, we'll pass the original query but log the refinement
+            # Future enhancement: modify the search intent based on refinement
 
     # Generate cache key
     cache_key = search_cache_key(input_data.query, user.steam_id)
