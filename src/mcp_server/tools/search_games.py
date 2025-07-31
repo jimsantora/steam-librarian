@@ -4,10 +4,16 @@ import logging
 import re
 from typing import Any
 
+from aiohttp import ClientSession
 from sqlalchemy.orm import joinedload
 
 from mcp_server.cache import cache, search_cache_key
 from mcp_server.server import mcp
+from mcp_server.services.feature_extractor import FeatureExtractor
+from mcp_server.services.genre_translator import GenreTranslator
+from mcp_server.services.mood_mapper import MoodMapper
+from mcp_server.services.similarity_finder import SimilarityFinder
+from mcp_server.services.time_normalizer import TimeNormalizer
 from mcp_server.user_context import resolve_user_context
 from mcp_server.validation import SearchGamesInput
 from shared.database import Game, UserGame, get_db
@@ -61,8 +67,8 @@ async def search_games(query: str, user_steam_id: str | None = None) -> str:
 async def _perform_enhanced_search(user, query: str) -> list[dict[str, Any]]:
     """Perform enhanced search with natural language understanding"""
 
-    # Parse search intent
-    search_intent = parse_enhanced_intent(query)
+    # Parse search intent using translation services
+    search_intent = await parse_enhanced_intent_with_services(query)
 
     with get_db() as session:
         # Get user's games with all related data
@@ -82,7 +88,7 @@ async def _perform_enhanced_search(user, query: str) -> list[dict[str, Any]]:
         if not user_games:
             return []
 
-        # Score and rank games based on search intent
+            # Score and rank games based on search intent
         scored_games = []
         for ug in user_games:
             if ug.game:
@@ -96,42 +102,126 @@ async def _perform_enhanced_search(user, query: str) -> list[dict[str, Any]]:
         return scored_games[:15]  # Top 15 results
 
 
-def parse_enhanced_intent(query: str) -> dict[str, Any]:
-    """Parse search query to understand user intent"""
+async def parse_enhanced_intent_with_services(query: str) -> dict[str, Any]:
+    """Parse search query using AI translation services"""
+
+    intent = {"text_terms": [], "genres": [], "moods": [], "time_constraints": None, "playtime_filter": None, "similarity_target": None, "features": [], "developers": []}
+
+    # Create a shared session for all services
+    async with ClientSession() as session:
+        # Initialize services
+        genre_translator = GenreTranslator(session)
+        mood_mapper = MoodMapper(session)
+        time_normalizer = TimeNormalizer(session)
+        feature_extractor = FeatureExtractor(session)
+        similarity_finder = SimilarityFinder(session)
+
+        # Extract components using services in parallel where possible
+        try:
+            # Check for similarity patterns first
+            similar_game = await similarity_finder.extract_game_name(query)
+            if similar_game:
+                intent["similarity_target"] = similar_game
+                # If we found a similarity target, get genres for that game type
+                related_genres = await genre_translator.find_similar_genres(similar_game)
+                intent["genres"].extend(related_genres)
+
+            # Extract genres from the query
+            genres = await genre_translator.translate_to_genres(query)
+            intent["genres"].extend(genres)
+
+            # Remove duplicates
+            intent["genres"] = list(set(intent["genres"]))
+
+            # Extract features
+            features = await feature_extractor.extract_features(query)
+            intent["features"] = features
+
+            # Map mood if present
+            # Look for mood-like words in the query
+            mood_words = ["relaxing", "chill", "intense", "exciting", "creative", "social", "nostalgic", "calm", "peaceful", "action", "adrenaline"]
+            for word in mood_words:
+                if word in query.lower():
+                    mood = await mood_mapper.map_to_mood(word)
+                    if mood not in intent["moods"]:
+                        intent["moods"].append(mood)
+                    break
+
+            # Check for time constraints
+            time_words = ["quick", "hour", "minutes", "short", "long", "brief", "session"]
+            if any(word in query.lower() for word in time_words):
+                time_dict = await time_normalizer.normalize_time(query)
+                # Convert to simple constraint
+                if time_dict["max"] <= 60:
+                    intent["time_constraints"] = "short"
+                elif time_dict["min"] >= 180:
+                    intent["time_constraints"] = "long"
+                else:
+                    intent["time_constraints"] = "medium"
+
+        except Exception as e:
+            logger.warning(f"Service error during intent parsing: {e}")
+            # Fall back to basic parsing
+            return parse_enhanced_intent_fallback(query)
+
+        # Extract playtime filters (keep existing logic)
+        query_lower = query.lower()
+        if any(word in query_lower for word in ["unplayed", "never played", "haven't played"]):
+            intent["playtime_filter"] = "unplayed"
+        elif any(word in query_lower for word in ["played", "completed", "finished"]):
+            intent["playtime_filter"] = "played"
+        elif any(word in query_lower for word in ["recent", "lately", "currently"]):
+            intent["playtime_filter"] = "recent"
+
+        # Extract remaining text terms
+        # Remove genre, mood, and feature words from query
+        text_terms = query_lower
+        for genre in intent["genres"]:
+            text_terms = text_terms.replace(genre.lower(), "")
+        for mood in intent["moods"]:
+            text_terms = text_terms.replace(mood, "")
+        for feature in intent["features"]:
+            text_terms = text_terms.replace(feature.lower(), "")
+        if intent["similarity_target"]:
+            text_terms = text_terms.replace(intent["similarity_target"].lower(), "")
+            text_terms = text_terms.replace("like", "")
+            text_terms = text_terms.replace("similar to", "")
+
+        # Clean up text terms
+        text_terms = " ".join(text_terms.split())
+        if text_terms:
+            intent["text_terms"] = [term for term in text_terms.split() if len(term) > 2]
+
+    return intent
+
+
+def parse_enhanced_intent_fallback(query: str) -> dict[str, Any]:
+    """Fallback parser if services fail"""
 
     query_lower = query.lower()
 
-    intent = {"text_terms": [], "genres": [], "moods": [], "time_constraints": None, "playtime_filter": None, "similarity_target": None, "developers": []}
+    intent = {"text_terms": [], "genres": [], "moods": [], "time_constraints": None, "playtime_filter": None, "similarity_target": None, "features": [], "developers": []}
 
-    # Extract mood indicators
-    mood_patterns = {"chill": ["chill", "relax", "calm", "peaceful", "zen", "casual"], "intense": ["intense", "action", "adrenaline", "fast", "exciting"], "creative": ["creative", "build", "craft", "create", "design"], "story": ["story", "narrative", "plot", "tale", "adventure"], "competitive": ["competitive", "pvp", "multiplayer", "versus"]}
-
-    for mood, keywords in mood_patterns.items():
-        if any(keyword in query_lower for keyword in keywords):
-            intent["moods"].append(mood)
-
-    # Extract genre mentions
+    # Basic genre extraction
     common_genres = ["action", "adventure", "rpg", "strategy", "simulation", "puzzle", "racing", "sports", "shooter", "platformer", "fighting", "horror", "indie", "casual", "mmo", "fps"]
 
     for genre in common_genres:
         if genre in query_lower:
             intent["genres"].append(genre.title())
 
-    # Extract time constraints
+    # Basic mood extraction
+    if any(word in query_lower for word in ["chill", "relax", "calm", "peaceful"]):
+        intent["moods"].append("chill")
+    elif any(word in query_lower for word in ["intense", "action", "exciting"]):
+        intent["moods"].append("intense")
+
+    # Basic time constraints
     if any(word in query_lower for word in ["quick", "short", "brief"]):
         intent["time_constraints"] = "short"
     elif any(word in query_lower for word in ["long", "deep", "extended"]):
         intent["time_constraints"] = "long"
 
-    # Extract playtime filters
-    if any(word in query_lower for word in ["unplayed", "never played", "haven't played"]):
-        intent["playtime_filter"] = "unplayed"
-    elif any(word in query_lower for word in ["played", "completed", "finished"]):
-        intent["playtime_filter"] = "played"
-    elif any(word in query_lower for word in ["recent", "lately", "currently"]):
-        intent["playtime_filter"] = "recent"
-
-    # Extract similarity targets ("like X", "similar to X")
+    # Extract similarity targets
     similarity_patterns = [r"like\s+([a-zA-Z0-9\s]+?)(?:\s|$)", r"similar\s+to\s+([a-zA-Z0-9\s]+?)(?:\s|$)"]
 
     for pattern in similarity_patterns:
@@ -140,16 +230,11 @@ def parse_enhanced_intent(query: str) -> dict[str, Any]:
             intent["similarity_target"] = matches[0].strip()
             break
 
-    # Extract remaining text terms (remove mood/genre words)
+    # Extract remaining text terms
     text_terms = query_lower
-    for mood_list in mood_patterns.values():
-        for word in mood_list:
-            text_terms = text_terms.replace(word, "")
-
     for genre in common_genres:
         text_terms = text_terms.replace(genre, "")
 
-    # Clean up text terms
     text_terms = " ".join(text_terms.split())
     if text_terms:
         intent["text_terms"] = [term for term in text_terms.split() if len(term) > 2]
@@ -173,11 +258,13 @@ def _calculate_search_score(user_game, search_intent: dict[str, Any], all_user_g
         text_weight = 0.1
         genre_weight = 0.2
         mood_weight = 0.1
+        feature_weight = 0.05
     else:
         # Normal weighting for non-similarity queries
-        text_weight = 0.4
+        text_weight = 0.3
         genre_weight = 0.3
         mood_weight = 0.2
+        feature_weight = 0.1
 
     # Text matching
     if search_intent["text_terms"]:
@@ -190,12 +277,19 @@ def _calculate_search_score(user_game, search_intent: dict[str, Any], all_user_g
 
         score += text_score * text_weight
 
-    # Genre matching
+    # Genre matching (enhanced with AI-translated genres)
     if search_intent["genres"] and game.genres:
-        genre_names = [g.genre_name.lower() for g in game.genres]
-        genre_matches = sum(1 for genre in search_intent["genres"] if genre.lower() in genre_names)
+        genre_names = [g.genre_name for g in game.genres]
+        genre_matches = sum(1 for genre in search_intent["genres"] if genre in genre_names)
         genre_score = genre_matches / len(search_intent["genres"])
         score += genre_score * genre_weight
+
+    # Feature matching (new!)
+    if search_intent["features"] and game.categories:
+        category_names = [c.category_name.lower() for c in game.categories]
+        feature_matches = sum(1 for feature in search_intent["features"] if feature.lower() in category_names)
+        feature_score = feature_matches / len(search_intent["features"]) if search_intent["features"] else 0
+        score += feature_score * feature_weight
 
     # Mood matching
     if search_intent["moods"]:
@@ -272,7 +366,8 @@ def _calculate_similarity_score(game, target_name: str, all_user_games) -> float
 def _calculate_mood_score(game, moods: list[str]) -> float:
     """Calculate how well a game matches mood requirements"""
 
-    mood_mappings = {"chill": ["Casual", "Puzzle", "Simulation", "Strategy"], "intense": ["Action", "FPS", "Fighting", "Racing"], "creative": ["Simulation", "Strategy", "Indie", "Building"], "story": ["Adventure", "RPG", "Indie", "Story Rich"], "competitive": ["Action", "Sports", "Racing", "Strategy"]}
+    # Updated mood mappings based on our mood mapper service
+    mood_mappings = {"chill": ["Casual", "Puzzle", "Simulation", "Strategy", "Indie"], "intense": ["Action", "FPS", "Fighting", "Racing", "Shooter"], "creative": ["Simulation", "Strategy", "Indie", "Building", "Sandbox"], "social": ["MMO", "Sports", "Racing", "Party", "Co-op"], "nostalgic": ["Retro", "Indie", "Platformer", "Arcade", "Classic"]}
 
     if not game.genres:
         return 0.0
@@ -310,19 +405,29 @@ def _generate_match_reasons(game, search_intent: dict[str, Any]) -> list[str]:
 
     reasons = []
 
+    # Similarity reasons (highest priority)
+    if search_intent["similarity_target"]:
+        reasons.append(f"Similar to {search_intent['similarity_target'].title()}")
+
     if search_intent["genres"] and game.genres:
         matching_genres = {g.genre_name for g in game.genres} & set(search_intent["genres"])
         if matching_genres:
             reasons.append(f"Matches genres: {', '.join(matching_genres)}")
 
+    if search_intent["features"] and game.categories:
+        category_names = [c.category_name for c in game.categories]
+        matching_features = [f for f in search_intent["features"] if any(f.lower() in cat.lower() for cat in category_names)]
+        if matching_features:
+            reasons.append(f"Features: {', '.join(matching_features[:2])}")
+
     if search_intent["moods"]:
-        mood_desc = {"chill": "relaxing gameplay", "intense": "action-packed experience", "creative": "creative gameplay", "story": "rich narrative", "competitive": "competitive gameplay"}
+        mood_desc = {"chill": "relaxing gameplay", "intense": "action-packed experience", "creative": "creative gameplay", "social": "great for playing with others", "nostalgic": "classic gaming experience"}
 
         for mood in search_intent["moods"]:
             if mood in mood_desc:
                 reasons.append(f"Good for {mood_desc[mood]}")
 
-    if search_intent["text_terms"]:
+    if search_intent["text_terms"] and not reasons:
         reasons.append("Matches search terms")
 
     return reasons[:3]  # Limit to top 3 reasons
