@@ -4,9 +4,14 @@ import logging
 from collections import Counter
 from typing import Any
 
+from mcp.server.fastmcp import Context
 from sqlalchemy.orm import joinedload
 
 from mcp_server.cache import cache, user_cache_key
+from mcp_server.enhanced_user_context import (
+    format_elicitation_error,
+    resolve_user_context_with_elicitation,
+)
 from mcp_server.server import mcp
 from mcp_server.user_context import resolve_user_context
 from mcp_server.validation import FriendsDataInput
@@ -16,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def get_friends_data(data_type: str, user_steam_id: str | None = None, friend_steam_id: str | None = None, game_identifier: str | None = None) -> str:
+async def get_friends_data(data_type: str, user_steam_id: str | None = None, friend_steam_id: str | None = None, game_identifier: str | None = None, ctx: Context | None = None) -> str:
     """Get social gaming data including friends lists, common games, and compatibility scores.
 
     Args:
@@ -32,10 +37,16 @@ async def get_friends_data(data_type: str, user_steam_id: str | None = None, fri
     except Exception as e:
         return f"Invalid input: {str(e)}"
 
-    # Resolve user context
-    user_context = await resolve_user_context(input_data.user_steam_id)
+    # Try enhanced user context resolution with elicitation if available
+    if ctx is not None:
+        user_context = await resolve_user_context_with_elicitation(input_data.user_steam_id, ctx, allow_elicitation=True)
+    else:
+        # Fallback to standard resolution
+        user_context = await resolve_user_context(input_data.user_steam_id)
+
     if "error" in user_context:
-        return f"User error: {user_context['message']}"
+        error_msg = format_elicitation_error(user_context) if ctx else user_context.get("message", "Unknown error")
+        return f"User error: {error_msg}"
 
     user = user_context["user"]
 
@@ -60,29 +71,34 @@ async def get_friends_data(data_type: str, user_steam_id: str | None = None, fri
 async def _get_friends_data(user: UserProfile, input_data: FriendsDataInput) -> dict[str, Any]:
     """Get friends data based on requested type"""
 
-    with get_db() as session:
-        # Get user's friends using the association table
-        friends_query = session.query(friends_association).filter(friends_association.c.user_steam_id == user.steam_id).all()
+    try:
+        with get_db() as session:
+            # Get user's friends using the association table
+            friends_query = session.query(friends_association).filter(friends_association.c.user_steam_id == user.steam_id).all()
 
-        if not friends_query:
-            return None
+            if not friends_query:
+                return {"error": "No friends found in your Steam friends list"}
 
-        # Convert to friend steam IDs
-        friend_steam_ids = [f.friend_steam_id for f in friends_query]
+            # Convert to friend steam IDs
+            friend_steam_ids = [f.friend_steam_id for f in friends_query]
 
-        if input_data.data_type == "common_games":
-            return await _get_common_games(session, user, input_data.friend_steam_id, friend_steam_ids)
+            if input_data.data_type == "common_games":
+                return await _get_common_games(session, user, input_data.friend_steam_id, friend_steam_ids)
 
-        elif input_data.data_type == "friend_activity":
-            return await _get_friend_activity(session, user, friend_steam_ids)
+            elif input_data.data_type == "friend_activity":
+                return await _get_friend_activity(session, user, friend_steam_ids)
 
-        elif input_data.data_type == "multiplayer_compatible":
-            return await _get_multiplayer_compatible(session, user, input_data.game_identifier, friend_steam_ids)
+            elif input_data.data_type == "multiplayer_compatible":
+                return await _get_multiplayer_compatible(session, user, input_data.game_identifier, friend_steam_ids)
 
-        elif input_data.data_type == "compatibility_score":
-            return await _calculate_compatibility_scores(session, user, input_data.friend_steam_id, friend_steam_ids)
+            elif input_data.data_type == "compatibility_score":
+                return await _calculate_compatibility_scores(session, user, input_data.friend_steam_id, friend_steam_ids)
 
-        return None
+            return {"error": f"Unknown data type: {input_data.data_type}"}
+
+    except Exception as e:
+        logger.error(f"Error getting friends data: {e}")
+        return {"error": f"Database error: {str(e)}"}
 
 
 async def _get_common_games(session, user: UserProfile, friend_steam_id: str | None, friend_steam_ids: list[str]) -> dict[str, Any]:
@@ -108,107 +124,122 @@ async def _get_common_games(session, user: UserProfile, friend_steam_id: str | N
 async def _compare_with_specific_friend(session, user: UserProfile, friend: UserProfile, user_game_ids: set) -> dict[str, Any]:
     """Compare games with a specific friend"""
 
-    # Get friend's games
-    friend_games = session.query(UserGame).options(joinedload(UserGame.game).joinedload(Game.genres), joinedload(UserGame.game).joinedload(Game.categories)).filter(UserGame.steam_id == friend.steam_id).all()
+    try:
+        # Get friend's games
+        friend_games = session.query(UserGame).options(joinedload(UserGame.game).joinedload(Game.genres), joinedload(UserGame.game).joinedload(Game.categories)).filter(UserGame.steam_id == friend.steam_id).all()
 
-    friend_game_ids = {fg.app_id for fg in friend_games}
+        friend_game_ids = {fg.app_id for fg in friend_games}
 
-    # Find common games
-    common_game_ids = user_game_ids & friend_game_ids
+        # Find common games
+        common_game_ids = user_game_ids & friend_game_ids
 
-    if not common_game_ids:
-        return {"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name}, "common_games": [], "total_common": 0, "recommendations": []}
+        if not common_game_ids:
+            return {"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name or "Unknown"}, "common_games": [], "total_common": 0, "recommendations": []}
 
-    # Get detailed info for common games
-    common_games = []
-    user_game_map = {ug.app_id: ug for ug in session.query(UserGame).filter(UserGame.steam_id == user.steam_id, UserGame.app_id.in_(common_game_ids)).all()}
+        # Get detailed info for common games
+        common_games = []
+        user_game_map = {ug.app_id: ug for ug in session.query(UserGame).filter(UserGame.steam_id == user.steam_id, UserGame.app_id.in_(common_game_ids)).all()}
 
-    friend_game_map = {fg.app_id: fg for fg in session.query(UserGame).filter(UserGame.steam_id == friend.steam_id, UserGame.app_id.in_(common_game_ids)).all()}
+        friend_game_map = {fg.app_id: fg for fg in session.query(UserGame).filter(UserGame.steam_id == friend.steam_id, UserGame.app_id.in_(common_game_ids)).all()}
 
-    for app_id in common_game_ids:
-        user_game = user_game_map.get(app_id)
-        friend_game = friend_game_map.get(app_id)
+        for app_id in common_game_ids:
+            user_game = user_game_map.get(app_id)
+            friend_game = friend_game_map.get(app_id)
 
-        if user_game and friend_game and user_game.game:
-            total_playtime = (user_game.playtime_forever + friend_game.playtime_forever) / 60
-            recent_activity = max(user_game.playtime_2weeks, friend_game.playtime_2weeks) > 0
+            if user_game and friend_game and user_game.game:
+                total_playtime = (user_game.playtime_forever + friend_game.playtime_forever) / 60
+                recent_activity = max(user_game.playtime_2weeks, friend_game.playtime_2weeks) > 0
 
-            common_games.append({"app_id": app_id, "name": user_game.game.name, "your_playtime_hours": round(user_game.playtime_forever / 60, 1), "friend_playtime_hours": round(friend_game.playtime_forever / 60, 1), "combined_playtime_hours": round(total_playtime, 1), "recently_active": recent_activity, "genres": [g.genre_name for g in user_game.game.genres] if user_game.game.genres else [], "is_multiplayer": _is_multiplayer_game(user_game.game)})
+                common_games.append({"app_id": app_id, "name": user_game.game.name or "Unknown Game", "your_playtime_hours": round(user_game.playtime_forever / 60, 1), "friend_playtime_hours": round(friend_game.playtime_forever / 60, 1), "combined_playtime_hours": round(total_playtime, 1), "recently_active": recent_activity, "genres": [g.genre_name for g in user_game.game.genres] if user_game.game.genres else [], "is_multiplayer": _is_multiplayer_game(user_game.game)})
 
-    # Sort by combined playtime
-    common_games.sort(key=lambda x: x["combined_playtime_hours"], reverse=True)
+        # Sort by combined playtime
+        common_games.sort(key=lambda x: x["combined_playtime_hours"], reverse=True)
 
-    # Generate game recommendations (games friend has that user doesn't)
-    friend_only_games = friend_game_ids - user_game_ids
-    recommendations = await _generate_friend_recommendations(session, friend, friend_only_games)
+        # Generate game recommendations (games friend has that user doesn't)
+        friend_only_games = friend_game_ids - user_game_ids
+        recommendations = await _generate_friend_recommendations(session, friend, friend_only_games)
 
-    return {"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name}, "common_games": common_games[:20], "total_common": len(common_games), "recommendations": recommendations[:5]}  # Top 20  # Top 5
+        return {"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name or "Unknown"}, "common_games": common_games[:20], "total_common": len(common_games), "recommendations": recommendations[:5]}
+
+    except Exception as e:
+        logger.error(f"Error in _compare_with_specific_friend: {e}")
+        return {"error": f"Failed to compare with friend: {str(e)}"}
 
 
 async def _compare_with_all_friends(session, user: UserProfile, friend_steam_ids: list[str], user_game_ids: set) -> dict[str, Any]:
     """Compare games with all friends"""
 
-    friend_comparisons = []
+    try:
+        friend_comparisons = []
 
-    for friend_steam_id in friend_steam_ids:
-        friend = session.query(UserProfile).filter_by(steam_id=friend_steam_id).first()
-        if not friend:
-            continue
+        for friend_steam_id in friend_steam_ids:
+            friend = session.query(UserProfile).filter_by(steam_id=friend_steam_id).first()
+            if not friend:
+                continue
 
-        # Get friend's games
-        friend_games = session.query(UserGame).filter(UserGame.steam_id == friend.steam_id).all()
-        friend_game_ids = {fg.app_id for fg in friend_games}
+            # Get friend's games
+            friend_games = session.query(UserGame).filter(UserGame.steam_id == friend.steam_id).all()
+            friend_game_ids = {fg.app_id for fg in friend_games}
 
-        # Calculate common games
-        common_game_ids = user_game_ids & friend_game_ids
-        common_count = len(common_game_ids)
+            # Calculate common games
+            common_game_ids = user_game_ids & friend_game_ids
+            common_count = len(common_game_ids)
 
-        if common_count > 0:
-            # Calculate compatibility score
-            compatibility = common_count / max(len(user_game_ids), len(friend_game_ids))
+            if common_count > 0:
+                # Calculate compatibility score
+                compatibility = common_count / max(len(user_game_ids), len(friend_game_ids))
 
-            friend_comparisons.append({"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name}, "common_games_count": common_count, "compatibility_score": round(compatibility * 100, 1), "total_friend_games": len(friend_game_ids)})
+                friend_comparisons.append({"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name or "Unknown"}, "common_games_count": common_count, "compatibility_score": round(compatibility * 100, 1), "total_friend_games": len(friend_game_ids)})
 
-    # Sort by common games count
-    friend_comparisons.sort(key=lambda x: x["common_games_count"], reverse=True)
+        # Sort by common games count
+        friend_comparisons.sort(key=lambda x: x["common_games_count"], reverse=True)
 
-    return {"friends_comparison": friend_comparisons, "total_friends": len(friend_comparisons)}
+        return {"friends_comparison": friend_comparisons, "total_friends": len(friend_comparisons)}
+
+    except Exception as e:
+        logger.error(f"Error in _compare_with_all_friends: {e}")
+        return {"error": f"Failed to compare with friends: {str(e)}"}
 
 
 async def _get_friend_activity(session, user: UserProfile, friend_steam_ids: list[str]) -> dict[str, Any]:
     """Get recent activity information for friends"""
 
-    active_friends = []
+    try:
+        active_friends = []
 
-    for friend_steam_id in friend_steam_ids:
-        friend = session.query(UserProfile).filter_by(steam_id=friend_steam_id).first()
-        if not friend:
-            continue
+        for friend_steam_id in friend_steam_ids:
+            friend = session.query(UserProfile).filter_by(steam_id=friend_steam_id).first()
+            if not friend:
+                continue
 
-        # Get friend's recent activity
-        recent_games = session.query(UserGame).options(joinedload(UserGame.game)).filter(UserGame.steam_id == friend.steam_id, UserGame.playtime_2weeks > 0).all()
+            # Get friend's recent activity
+            recent_games = session.query(UserGame).options(joinedload(UserGame.game)).filter(UserGame.steam_id == friend.steam_id, UserGame.playtime_2weeks > 0).all()
 
-        if recent_games:
-            total_recent_hours = sum(rg.playtime_2weeks / 60 for rg in recent_games)
+            if recent_games:
+                total_recent_hours = sum(rg.playtime_2weeks / 60 for rg in recent_games)
 
-            # Find most played recent game
-            most_played_recent = max(recent_games, key=lambda x: x.playtime_2weeks)
+                # Find most played recent game
+                most_played_recent = max(recent_games, key=lambda x: x.playtime_2weeks)
 
-            # Get recent genres
-            recent_genres = Counter()
-            for rg in recent_games:
-                if rg.game and rg.game.genres:
-                    for genre in rg.game.genres:
-                        recent_genres[genre.genre_name] += rg.playtime_2weeks
+                # Get recent genres
+                recent_genres = Counter()
+                for rg in recent_games:
+                    if rg.game and rg.game.genres:
+                        for genre in rg.game.genres:
+                            recent_genres[genre.genre_name] += rg.playtime_2weeks
 
-            top_genre = recent_genres.most_common(1)[0][0] if recent_genres else "Unknown"
+                top_genre = recent_genres.most_common(1)[0][0] if recent_genres else "Unknown"
 
-            active_friends.append({"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name}, "recent_hours": round(total_recent_hours, 1), "recent_games_count": len(recent_games), "most_played_recent": {"name": most_played_recent.game.name if most_played_recent.game else "Unknown", "hours": round(most_played_recent.playtime_2weeks / 60, 1)}, "top_recent_genre": top_genre})
+                active_friends.append({"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name or "Unknown"}, "recent_hours": round(total_recent_hours, 1), "recent_games_count": len(recent_games), "most_played_recent": {"name": most_played_recent.game.name if most_played_recent.game else "Unknown", "hours": round(most_played_recent.playtime_2weeks / 60, 1)}, "top_recent_genre": top_genre})
 
-    # Sort by recent activity
-    active_friends.sort(key=lambda x: x["recent_hours"], reverse=True)
+        # Sort by recent activity
+        active_friends.sort(key=lambda x: x["recent_hours"], reverse=True)
 
-    return {"active_friends": active_friends, "total_active": len(active_friends)}
+        return {"active_friends": active_friends, "total_active": len(active_friends)}
+
+    except Exception as e:
+        logger.error(f"Error in _get_friend_activity: {e}")
+        return {"error": f"Failed to get friend activity: {str(e)}"}
 
 
 async def _get_multiplayer_compatible(session, user: UserProfile, game_identifier: str | None, friend_steam_ids: list[str]) -> dict[str, Any]:
@@ -217,41 +248,46 @@ async def _get_multiplayer_compatible(session, user: UserProfile, game_identifie
     if not game_identifier:
         return {"error": "Game identifier is required for multiplayer compatibility check"}
 
-    # Find the game
     try:
-        # Try as app_id first
-        app_id = int(game_identifier)
-        game = session.query(Game).filter_by(app_id=app_id).first()
-    except ValueError:
-        # Search by name
-        game = session.query(Game).filter(Game.name.ilike(f"%{game_identifier}%")).first()
+        # Find the game
+        try:
+            # Try as app_id first
+            app_id = int(game_identifier)
+            game = session.query(Game).filter_by(app_id=app_id).first()
+        except ValueError:
+            # Search by name
+            game = session.query(Game).filter(Game.name.ilike(f"%{game_identifier}%")).first()
 
-    if not game:
-        return {"error": f"Game '{game_identifier}' not found"}
+        if not game:
+            return {"error": f"Game '{game_identifier}' not found"}
 
-    # Check if user owns the game
-    user_owns = session.query(UserGame).filter(UserGame.steam_id == user.steam_id, UserGame.app_id == game.app_id).first()
+        # Check if user owns the game
+        user_owns = session.query(UserGame).filter(UserGame.steam_id == user.steam_id, UserGame.app_id == game.app_id).first()
 
-    if not user_owns:
-        return {"error": f"You don't own {game.name}"}
+        if not user_owns:
+            return {"error": f"You don't own {game.name}"}
 
-    # Find friends who also own this game
-    compatible_friends = []
+        # Find friends who also own this game
+        compatible_friends = []
 
-    for friend_steam_id in friend_steam_ids:
-        friend = session.query(UserProfile).filter_by(steam_id=friend_steam_id).first()
-        if not friend:
-            continue
+        for friend_steam_id in friend_steam_ids:
+            friend = session.query(UserProfile).filter_by(steam_id=friend_steam_id).first()
+            if not friend:
+                continue
 
-        friend_game = session.query(UserGame).filter(UserGame.steam_id == friend.steam_id, UserGame.app_id == game.app_id).first()
+            friend_game = session.query(UserGame).filter(UserGame.steam_id == friend.steam_id, UserGame.app_id == game.app_id).first()
 
-        if friend_game:
-            compatible_friends.append({"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name}, "playtime_hours": round(friend_game.playtime_forever / 60, 1), "recent_playtime_hours": round(friend_game.playtime_2weeks / 60, 1), "is_active": friend_game.playtime_2weeks > 0})
+            if friend_game:
+                compatible_friends.append({"friend": {"steam_id": friend.steam_id, "persona_name": friend.persona_name or "Unknown"}, "playtime_hours": round(friend_game.playtime_forever / 60, 1), "recent_playtime_hours": round(friend_game.playtime_2weeks / 60, 1), "is_active": friend_game.playtime_2weeks > 0})
 
-    # Sort by recent activity, then total playtime
-    compatible_friends.sort(key=lambda x: (x["is_active"], x["recent_playtime_hours"], x["playtime_hours"]), reverse=True)
+        # Sort by recent activity, then total playtime
+        compatible_friends.sort(key=lambda x: (x["is_active"], x["recent_playtime_hours"], x["playtime_hours"]), reverse=True)
 
-    return {"game": {"app_id": game.app_id, "name": game.name}, "your_playtime_hours": round(user_owns.playtime_forever / 60, 1), "is_multiplayer": _is_multiplayer_game(game), "compatible_friends": compatible_friends, "total_compatible": len(compatible_friends)}
+        return {"game": {"app_id": game.app_id, "name": game.name}, "your_playtime_hours": round(user_owns.playtime_forever / 60, 1), "is_multiplayer": _is_multiplayer_game(game), "compatible_friends": compatible_friends, "total_compatible": len(compatible_friends)}
+
+    except Exception as e:
+        logger.error(f"Error in _get_multiplayer_compatible: {e}")
+        return {"error": f"Failed to check multiplayer compatibility: {str(e)}"}
 
 
 async def _calculate_compatibility_scores(session, user: UserProfile, specific_friend_id: str | None, friend_steam_ids: list[str]) -> dict[str, Any]:
@@ -368,15 +404,21 @@ def _is_multiplayer_game(game: Game) -> bool:
 def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile) -> str:
     """Format friends data for display"""
 
+    # Add error handling for missing data
+    if not data or "error" in data:
+        error_msg = data.get("error", "Unknown error occurred") if data else "No data available"
+        return f"Error: {error_msg}"
+
     if data_type == "common_games":
         if "friend" in data:
             # Specific friend comparison
-            friend = data["friend"]
-            common_games = data["common_games"]
-            total_common = data["total_common"]
-            recommendations = data["recommendations"]
+            friend = data.get("friend", {})
+            common_games = data.get("common_games", [])
+            total_common = data.get("total_common", 0)
+            recommendations = data.get("recommendations", [])
 
-            result = f"**Common Games with {friend['persona_name']}**\n\n"
+            friend_name = friend.get("persona_name", "Unknown Friend") if friend else "Unknown Friend"
+            result = f"**Common Games with {friend_name}**\n\n"
             result += f"**{total_common} games in common**\n\n"
 
             if common_games:
@@ -405,9 +447,9 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
             return result
 
         else:
-            # All friends comparison
-            friends_comparison = data["friends_comparison"]
-            total_friends = data["total_friends"]
+            # All friends comparison - fix the key error
+            friends_comparison = data.get("friends_comparison", [])
+            total_friends = data.get("total_friends", 0)
 
             result = f"**Gaming Compatibility with Friends** ({total_friends} friends)\n\n"
 
@@ -428,8 +470,8 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
             return result
 
     elif data_type == "friend_activity":
-        active_friends = data["active_friends"]
-        total_active = data["total_active"]
+        active_friends = data.get("active_friends", [])
+        total_active = data.get("total_active", 0)
 
         result = f"**Recent Friend Activity** ({total_active} active friends)\n\n"
 
@@ -451,15 +493,19 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
         return result
 
     elif data_type == "multiplayer_compatible":
-        game_info = data["game"]
-        compatible_friends = data["compatible_friends"]
-        total_compatible = data["total_compatible"]
+        # Fix the 'game' key error
+        game_info = data.get("game", {})
+        compatible_friends = data.get("compatible_friends", [])
+        total_compatible = data.get("total_compatible", 0)
+        is_multiplayer = data.get("is_multiplayer", False)
+        your_playtime = data.get("your_playtime_hours", 0)
 
-        multiplayer_status = "✅ Multiplayer" if data["is_multiplayer"] else "❌ Single-player only"
+        game_name = game_info.get("name", "Unknown Game") if game_info else "Unknown Game"
+        multiplayer_status = "✅ Multiplayer" if is_multiplayer else "❌ Single-player only"
 
-        result = f"**Multiplayer Compatibility: {game_info['name']}**\n\n"
+        result = f"**Multiplayer Compatibility: {game_name}**\n\n"
         result += f"{multiplayer_status}\n"
-        result += f"Your playtime: {data['your_playtime_hours']}h\n\n"
+        result += f"Your playtime: {your_playtime}h\n\n"
         result += f"**{total_compatible} friends own this game:**\n\n"
 
         if compatible_friends:
@@ -481,7 +527,7 @@ def _format_friends_data(data: dict[str, Any], data_type: str, user: UserProfile
         return result
 
     elif data_type == "compatibility_score":
-        compatibility_scores = data["compatibility_scores"]
+        compatibility_scores = data.get("compatibility_scores", [])
 
         result = f"**Gaming Compatibility Analysis for {user.persona_name}**\n\n"
 
