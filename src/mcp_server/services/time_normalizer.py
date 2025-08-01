@@ -5,6 +5,7 @@ import logging
 import re
 
 from mcp import ClientSession, SamplingMessage
+from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,9 @@ class TimeNormalizer:
             messages = [
                 SamplingMessage(
                     role="user",
-                    content=f"""Convert this time expression to a range in minutes: "{time_phrase}"
+                    content=TextContent(
+                        type="text",
+                        text=f"""Convert this time expression to a range in minutes: "{time_phrase}"
 
 Return a JSON object with "min" and "max" keys representing the likely range.
 Be generous with ranges to account for variation.
@@ -48,6 +51,7 @@ Examples:
 - "15-20 minutes" → {{"min": 15, "max": 20}}
 
 Return ONLY the JSON object.""",
+                    ),
                 )
             ]
 

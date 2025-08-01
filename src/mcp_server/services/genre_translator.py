@@ -4,6 +4,7 @@ import json
 import logging
 
 from mcp import ClientSession, SamplingMessage
+from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,9 @@ class GenreTranslator:
             messages = [
                 SamplingMessage(
                     role="user",
-                    content=f"""Given this phrase: "{phrase}"
+                    content=TextContent(
+                        type="text",
+                        text=f"""Given this phrase: "{phrase}"
 
 What Steam genres best match? Choose from: {', '.join(self.STEAM_GENRES)}
 
@@ -155,6 +158,7 @@ Examples:
 - "games like portal" → ["Puzzle", "Platformer", "Indie"]
 
 Return ONLY the JSON array, no explanation.""",
+                    ),
                 )
             ]
 
@@ -188,7 +192,9 @@ Return ONLY the JSON array, no explanation.""",
             messages = [
                 SamplingMessage(
                     role="user",
-                    content=f"""Given the Steam genre: "{genre}"
+                    content=TextContent(
+                        type="text",
+                        text=f"""Given the Steam genre: "{genre}"
 
 What other genres are most similar or often enjoyed by the same players?
 Choose from: {', '.join(self.STEAM_GENRES)}
@@ -201,6 +207,7 @@ Examples:
 - "RPG" → ["Adventure", "Strategy", "Open World", "Fantasy"]
 
 Return ONLY the JSON array.""",
+                    ),
                 )
             ]
 

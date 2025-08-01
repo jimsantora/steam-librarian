@@ -4,6 +4,7 @@ import json
 import logging
 
 from mcp import ClientSession, SamplingMessage
+from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,9 @@ class FeatureExtractor:
             messages = [
                 SamplingMessage(
                     role="user",
-                    content=f"""Extract game features from this description: "{description}"
+                    content=TextContent(
+                        type="text",
+                        text=f"""Extract game features from this description: "{description}"
 
 Available features: {', '.join(self.GAME_FEATURES[:30])} (and more)
 
@@ -139,6 +142,7 @@ Examples:
 - "retro platformer" → ["platforming", "pixel-art", "2d", "side-scrolling"]
 
 Return ONLY the JSON array.""",
+                    ),
                 )
             ]
 

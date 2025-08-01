@@ -3,6 +3,7 @@
 import logging
 
 from mcp import ClientSession, SamplingMessage
+from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,9 @@ class MoodMapper:
             messages = [
                 SamplingMessage(
                     role="user",
-                    content=f"""Map this sentiment to ONE of these moods: {', '.join(self.SUPPORTED_MOODS)}
+                    content=TextContent(
+                        type="text",
+                        text=f"""Map this sentiment to ONE of these moods: {', '.join(self.SUPPORTED_MOODS)}
 
 Sentiment: "{sentiment}"
 
@@ -54,6 +57,7 @@ Examples:
 - "like the old days" → nostalgic
 
 Return ONLY the mood word, nothing else.""",
+                    ),
                 )
             ]
 
