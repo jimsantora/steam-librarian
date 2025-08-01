@@ -13,7 +13,6 @@ from mcp_server.enhanced_user_context import (
     resolve_user_context_with_elicitation,
 )
 from mcp_server.server import mcp
-from mcp_server.user_context import resolve_user_context
 from mcp_server.validation import FriendsDataInput
 from shared.database import Game, UserGame, UserProfile, friends_association, get_db
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def get_friends_data(data_type: str, user_steam_id: str | None = None, friend_steam_id: str | None = None, game_identifier: str | None = None, ctx: Context | None = None) -> str:
+async def get_friends_data(ctx: Context, data_type: str, user_steam_id: str | None = None, friend_steam_id: str | None = None, game_identifier: str | None = None) -> str:
     """Get social gaming data including friends lists, common games, and compatibility scores.
 
     Args:
@@ -37,15 +36,11 @@ async def get_friends_data(data_type: str, user_steam_id: str | None = None, fri
     except Exception as e:
         return f"Invalid input: {str(e)}"
 
-    # Try enhanced user context resolution with elicitation if available
-    if ctx is not None:
-        user_context = await resolve_user_context_with_elicitation(input_data.user_steam_id, ctx, allow_elicitation=True)
-    else:
-        # Fallback to standard resolution
-        user_context = await resolve_user_context(input_data.user_steam_id)
+    # Try enhanced user context resolution with elicitation (ctx is always available now)
+    user_context = await resolve_user_context_with_elicitation(input_data.user_steam_id, ctx, allow_elicitation=True)
 
     if "error" in user_context:
-        error_msg = format_elicitation_error(user_context) if ctx else user_context.get("message", "Unknown error")
+        error_msg = format_elicitation_error(user_context)
         return f"User error: {error_msg}"
 
     user = user_context["user"]

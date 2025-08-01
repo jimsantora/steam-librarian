@@ -19,7 +19,6 @@ from mcp_server.services.genre_translator import GenreTranslator
 from mcp_server.services.mood_mapper import MoodMapper
 from mcp_server.services.similarity_finder import SimilarityFinder
 from mcp_server.services.time_normalizer import TimeNormalizer
-from mcp_server.user_context import resolve_user_context
 from mcp_server.utils.elicitation import (
     elicit_search_refinement,
     should_elicit_for_query,
@@ -31,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def search_games(query: str, user_steam_id: str | None = None, ctx: Context | None = None) -> str:
+async def search_games(ctx: Context, query: str, user_steam_id: str | None = None) -> str:
     """Natural language game search across your Steam library with intelligent parsing.
 
     Supports mood-based searches, genre detection, similarity matching, and contextual understanding.
@@ -44,21 +43,17 @@ async def search_games(query: str, user_steam_id: str | None = None, ctx: Contex
     except Exception as e:
         return f"Invalid input: {str(e)}"
 
-    # Try enhanced user context resolution with elicitation if available
-    if ctx is not None:
-        user_context = await resolve_user_context_with_elicitation(input_data.user_steam_id, ctx, allow_elicitation=True)
-    else:
-        # Fallback to standard resolution
-        user_context = await resolve_user_context(input_data.user_steam_id)
+    # Try enhanced user context resolution with elicitation (ctx is always available now)
+    user_context = await resolve_user_context_with_elicitation(input_data.user_steam_id, ctx, allow_elicitation=True)
 
     if "error" in user_context:
-        error_msg = format_elicitation_error(user_context) if ctx else user_context.get("message", "Unknown error")
+        error_msg = format_elicitation_error(user_context)
         return f"User error: {error_msg}"
 
     user = user_context["user"]
 
     # Check if query needs refinement via elicitation
-    if ctx is not None and should_elicit_for_query(input_data.query):
+    if should_elicit_for_query(input_data.query):
         refinement = await elicit_search_refinement(ctx, input_data.query)
         if refinement:
             # Apply refinement to query - this is a simplified approach

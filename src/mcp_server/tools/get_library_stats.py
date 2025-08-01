@@ -4,6 +4,7 @@ import logging
 from collections import Counter
 from typing import Any
 
+from mcp.server.fastmcp import Context
 from sqlalchemy.orm import joinedload
 
 from mcp_server.cache import cache, user_cache_key
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def get_library_stats(user_steam_id: str | None = None, time_period: str = "all_time", include_insights: bool = True) -> str:
+async def get_library_stats(ctx: Context, user_steam_id: str | None = None, time_period: str = "all_time", include_insights: bool = True) -> str:
     """Get comprehensive library statistics and insights for a user.
 
     Args:
