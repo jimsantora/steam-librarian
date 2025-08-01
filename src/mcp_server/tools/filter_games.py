@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+from mcp.server.fastmcp import Context
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-async def filter_games(user_steam_id: str | None = None, playtime_min: float | None = None, playtime_max: float | None = None, review_summary: list[str] | None = None, maturity_rating: str | None = None, preset: str | None = None, categories: list[str] | None = None, sort_by: str | None = None) -> str:
+async def filter_games(ctx: Context, user_steam_id: str | None = None, playtime_min: float | None = None, playtime_max: float | None = None, review_summary: list[str] | None = None, maturity_rating: str | None = None, preset: str | None = None, categories: list[str] | None = None, sort_by: str | None = None) -> str:
     """Filter user's Steam library with intelligent presets and custom criteria.
 
     Args:

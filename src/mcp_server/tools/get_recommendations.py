@@ -18,7 +18,6 @@ from mcp_server.services.feature_extractor import FeatureExtractor
 from mcp_server.services.genre_translator import GenreTranslator
 from mcp_server.services.mood_mapper import MoodMapper
 from mcp_server.services.time_normalizer import TimeNormalizer
-from mcp_server.user_context import resolve_user_context
 from shared.database import Game, UserGame, UserProfile, get_db
 
 logger = logging.getLogger(__name__)
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 @mcp.tool()
 async def get_recommendations(
+    ctx: Context,
     steam_id: str | None = None,
     context: str | None = None,
     mood: str | None = None,
@@ -34,7 +34,6 @@ async def get_recommendations(
     features: list[str] | None = None,
     exclude_recent: bool = True,
     limit: int = 10,
-    ctx: Context | None = None,
 ) -> str:
     """Get personalized game recommendations based on your library and preferences.
 
@@ -54,15 +53,11 @@ async def get_recommendations(
         limit: Maximum number of recommendations (default: 10)
     """
 
-    # Try enhanced user context resolution with elicitation if available
-    if ctx is not None:
-        user_context = await resolve_user_context_with_elicitation(steam_id, ctx, allow_elicitation=True)
-    else:
-        # Fallback to standard resolution
-        user_context = await resolve_user_context(steam_id)
+    # Try enhanced user context resolution with elicitation (ctx is always available now)
+    user_context = await resolve_user_context_with_elicitation(steam_id, ctx, allow_elicitation=True)
 
     if "error" in user_context:
-        error_msg = format_elicitation_error(user_context) if ctx else user_context.get("message", "Unknown error")
+        error_msg = format_elicitation_error(user_context)
         return f"User error: {error_msg}"
 
     user = user_context["user"]
