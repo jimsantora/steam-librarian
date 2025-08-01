@@ -4,6 +4,7 @@ import logging
 import re
 
 from mcp import ClientSession, SamplingMessage
+from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,9 @@ class SimilarityFinder:
             messages = [
                 SamplingMessage(
                     role="user",
-                    content=f"""Extract the game name being referenced in this query: "{query}"
+                    content=TextContent(
+                        type="text",
+                        text=f"""Extract the game name being referenced in this query: "{query}"
 
 If the query mentions a specific game for comparison, return just the game name.
 If no specific game is mentioned, return null.
@@ -50,6 +53,7 @@ Examples:
 - "something fun" → null
 
 Return ONLY the game name or null, nothing else.""",
+                    ),
                 )
             ]
 
