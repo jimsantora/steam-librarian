@@ -27,6 +27,12 @@ The fetcher extracts comprehensive game information from Steam's APIs:
 - **External Links**: Metacritic scores and review URLs
 - **Content Organization**: Genres, categories, developers, publishers
 
+#### From Steam Store Pages (HTML Parsing)
+- **User-Generated Tags**: Community-driven tags like "Roguelike", "Hero Shooter", "Class-Based"
+- **Gameplay Styles**: Fine-grained classification beyond basic genres
+- **Community Insights**: Tags reflect actual player experience and perception
+- **Rich Metadata**: Up to 20 most popular tags per game
+
 #### From Steam Web API (`GetOwnedGames`)
 - **Ownership Data**: User's owned games list
 - **Playtime Statistics**: Total and recent (2-week) playtime
@@ -49,6 +55,7 @@ class SteamLibraryFetcher:
     def get_owned_games(self, steam_id: str) -> list[dict]
     def get_app_details(self, appid: int) -> dict | None
     def get_app_reviews(self, appid: int) -> dict | None
+    def get_app_tags(self, appid: int) -> list[str] | None
     def get_player_summaries(self, steam_ids: str) -> list[dict]
     def get_player_badges(self, steam_id: str) -> dict | None
     def get_friend_list(self, steam_id: str) -> list[dict]
@@ -71,6 +78,7 @@ class SteamLibraryFetcher:
 3. For Each Game:
    ├── Game Details → Steam Store API → Parse metadata
    ├── Game Reviews → Steam Reviews API → Parse review data
+   ├── User Tags → Steam Store Page → Extract community tags
    ├── Data Validation → Clean and normalize
    └── Database Storage → Save to normalized schema
 4. Friends (Optional) → Batch process friend profiles and libraries
@@ -202,7 +210,7 @@ except Exception as e:
 - **User Profiles**: Steam account information and statistics
 - **Games**: Comprehensive game metadata with relationships
 - **Reviews**: Separate table for review data
-- **Many-to-Many**: Genres, developers, publishers, categories
+- **Many-to-Many**: Genres, developers, publishers, categories, user tags
 - **Social**: Friends relationships and their libraries
 
 ### Transaction Management
@@ -277,7 +285,9 @@ logger.error(f"Failed to process game {game_name}: {error}")
 - **Official Ratings**: ESRB and PEGI rating extraction
 - **Accessibility**: Controller and VR support detection
 - **Media URLs**: Header images and Metacritic links
+- **User Tags**: Community-generated tags from Steam store pages
 - **Improved Caching**: Game-level cache validation
+- **Tag Intelligence**: Superior game classification for MCP tools
 
 ### Previous Versions
 - **v1.1.2**: Added friends network processing
@@ -295,6 +305,7 @@ logger.error(f"Failed to process game {game_name}: {error}")
 - **Steam Web API**: User profiles, game ownership, friends
 - **Steam Store API**: Game details, metadata, media
 - **Steam Reviews API**: Review summaries and statistics
+- **Steam Store Pages**: User-generated tags via HTML parsing
 
 ## Best Practices
 

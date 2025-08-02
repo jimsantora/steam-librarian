@@ -39,6 +39,7 @@ from shared.database import (
     GameReview,
     Genre,
     Publisher,
+    Tag,
     UserGame,
     UserProfile,
     create_database,
@@ -155,6 +156,44 @@ class SteamLibraryFetcher:
             logger.debug(f"Error fetching app details for {appid}: {e}")
 
         return None
+
+    def get_app_tags(self, appid: int) -> list[str] | None:
+        """Get user-generated tags for an app from Steam store page"""
+        self._rate_limit()
+
+        url = f"https://store.steampowered.com/app/{appid}/"
+
+        try:
+            response = self.session.get(url, timeout=30)
+
+            if response.status_code == 200:
+                return self._extract_tags_from_html(response.text)
+            else:
+                logger.debug(f"Store page returned {response.status_code} for appid {appid}")
+
+        except Exception as e:
+            logger.debug(f"Error fetching tags for {appid}: {e}")
+
+        return None
+
+    def _extract_tags_from_html(self, html_content: str) -> list[str]:
+        """Extract tags from Steam store page HTML"""
+        import re
+        
+        tags = []
+        
+        # Pattern to match the tag links within the popular_tags section
+        pattern = r'<a[^>]+class="app_tag"[^>]*>(.*?)</a>'
+        
+        matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
+        
+        for match in matches:
+            # Clean up the tag text (remove extra whitespace and newlines)
+            tag = re.sub(r'\s+', ' ', match.strip())
+            if tag and tag != '+':  # Skip the '+' button
+                tags.append(tag)
+        
+        return tags
 
     def get_app_reviews(self, appid: int) -> dict | None:
         """Get review summary for an app"""
@@ -372,7 +411,7 @@ class SteamLibraryFetcher:
         # Progress indicator
         logger.info(f"Processing [{index}/{total}]: {name} (AppID: {appid}) - Fetching fresh data")
 
-        game_info = {"appid": appid, "name": name, "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "short_description": "", "detailed_description": "", "about_the_game": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
+        game_info = {"appid": appid, "name": name, "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "short_description": "", "detailed_description": "", "about_the_game": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "tags": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
 
         # Get detailed app information
         app_details = self.get_app_details(appid)
@@ -457,6 +496,12 @@ class SteamLibraryFetcher:
             game_info["total_reviews"] = reviews.get("total_reviews", 0)
             game_info["positive_reviews"] = reviews.get("total_positive", 0)
             game_info["negative_reviews"] = reviews.get("total_negative", 0)
+
+        # Get user-generated tags
+        tags = self.get_app_tags(appid)
+        if tags:
+            game_info["tags"] = ", ".join(tags[:20])  # Limit to first 20 tags
+            logger.debug(f"Found {len(tags)} tags for {name}: {', '.join(tags[:5])}...")
 
         return game_info
 
@@ -551,6 +596,14 @@ class SteamLibraryFetcher:
                         if cat_name.strip():
                             category = get_or_create(session, Category, category_name=cat_name.strip())
                             game.categories.append(category)
+
+                # Handle tags
+                if game_data.get("tags"):
+                    game.tags.clear()
+                    for tag_name in game_data["tags"].split(", "):
+                        if tag_name.strip():
+                            tag = get_or_create(session, Tag, tag_name=tag_name.strip())
+                            game.tags.append(tag)
 
                 # Handle reviews
                 if game_data.get("review_summary", "Unknown") != "Unknown" or game_data.get("total_reviews", 0) > 0:

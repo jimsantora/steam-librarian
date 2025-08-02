@@ -87,6 +87,13 @@ Many-to-Many Relationship Tables:
 │ category_name   │     │ category_id     │──-──│ category_id     │
 └─────────────────┘     │ (PK,FK)         │     │ (PK,FK)         │
                         └─────────────────┘     └─────────────────┘
+
+┌─────────────────┐                    ┌─────────────────┐
+│      tags       │                    │   game_tags     │
+├─────────────────┤     ┌─────────────────┐     ┌─────────────────┐
+│ tag_id (PK)     │──-──│ app_id (PK,FK)  │     │ app_id (PK,FK)  │
+│ tag_name        │     │ tag_id (PK,FK)  │──-──│ tag_id (PK,FK)  │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
 ## Table Descriptions
@@ -203,6 +210,16 @@ Steam categories (Single-player, Multiplayer, etc.).
 | `game_categories` | `app_id` | INTEGER (PK, FK) | References `games.app_id` |
 | `game_categories` | `category_id` | INTEGER (PK, FK) | References `categories.category_id` |
 
+#### `tags` & `game_tags`
+User-generated tags from Steam community (Roguelike, Arcade, etc.).
+
+| Table | Column | Type | Description |
+|-------|--------|------|-------------|
+| `tags` | `tag_id` | INTEGER (PK) | Auto-incrementing ID |
+| `tags` | `tag_name` | STRING | User-generated tag name |
+| `game_tags` | `app_id` | INTEGER (PK, FK) | References `games.app_id` |
+| `game_tags` | `tag_id` | INTEGER (PK, FK) | References `tags.tag_id` |
+
 ### `friends`
 Association table for user friendships.
 
@@ -223,6 +240,7 @@ Association table for user friendships.
 - **games ──< game_developers >── developers**: Many-to-Many relationship  
 - **games ──< game_publishers >── publishers**: Many-to-Many relationship
 - **games ──< game_categories >── categories**: Many-to-Many relationship
+- **games ──< game_tags >── tags**: Many-to-Many relationship
 
 ### Legend
 - **PK** = Primary Key
@@ -310,6 +328,15 @@ Based on the migrated data:
 - **Added**: `platforms_windows/mac/linux` - Platform-specific compatibility
 - **Added**: `esrb_rating/descriptors` - Official ESRB rating data
 - **Added**: `pegi_rating/descriptors` - Official PEGI rating data
+- **Added**: `tags` table and `game_tags` association - User-generated tags from Steam store pages
 - **Enhanced**: `controller_support` - Now populated from Steam API
 - **Enhanced**: `vr_support` - Detected from Steam categories
 - **Updated**: Index from `maturity_rating` to `esrb_rating`
+
+### Tag System Enhancement
+The latest update introduces comprehensive user-generated tag collection:
+- **Source**: Steam store page HTML parsing (official but undocumented)
+- **Coverage**: Community-driven tags like "Roguelike", "Arcade", "Puzzle", "Card Game"
+- **Intelligence**: Superior game classification beyond basic categories
+- **Performance**: Respectful rate limiting to Steam's servers
+- **Storage**: Normalized many-to-many relationship for efficient querying

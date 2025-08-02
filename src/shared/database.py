@@ -111,6 +111,8 @@ game_publishers = Table("game_publishers", Base.metadata, Column("app_id", Integ
 
 game_categories = Table("game_categories", Base.metadata, Column("app_id", Integer, ForeignKey("games.app_id"), primary_key=True), Column("category_id", Integer, ForeignKey("categories.category_id"), primary_key=True))
 
+game_tags = Table("game_tags", Base.metadata, Column("app_id", Integer, ForeignKey("games.app_id"), primary_key=True), Column("tag_id", Integer, ForeignKey("tags.tag_id"), primary_key=True))
+
 # Association table for friends relationships
 friends_association = Table("friends", Base.metadata, Column("user_steam_id", String, ForeignKey("user_profile.steam_id"), primary_key=True), Column("friend_steam_id", String, ForeignKey("user_profile.steam_id"), primary_key=True), Column("relationship", String), Column("friend_since", Integer), Index("idx_friends_user_steam_id", "user_steam_id"), Index("idx_friends_friend_steam_id", "friend_steam_id"))  # 'friend' or 'all'  # Unix timestamp
 
@@ -170,6 +172,7 @@ class Game(Base):
     developers = relationship("Developer", secondary=game_developers, back_populates="games")
     publishers = relationship("Publisher", secondary=game_publishers, back_populates="games")
     categories = relationship("Category", secondary=game_categories, back_populates="games")
+    tags = relationship("Tag", secondary=game_tags, back_populates="games")
 
     # Indexes for search and filtering
     __table_args__ = (
@@ -247,6 +250,16 @@ class Category(Base):
 
     # Relationships
     games = relationship("Game", secondary=game_categories, back_populates="categories")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    tag_id = Column(Integer, primary_key=True, autoincrement=True)
+    tag_name = Column(String, unique=True, nullable=False)
+
+    # Relationships
+    games = relationship("Game", secondary=game_tags, back_populates="tags")
 
 
 class GameReview(Base):
