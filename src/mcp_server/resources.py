@@ -45,9 +45,9 @@ def get_game(game_id: str) -> str:
                     "publishers": [p.publisher_name for p in game.publishers],
                     "categories": [c.category_name for c in game.categories],
                     "release_date": game.release_date,
-                    "maturity_rating": game.maturity_rating,
+                    "esrb_rating": game.esrb_rating,
                     "required_age": game.required_age,
-                    "content_descriptors": game.content_descriptors
+                    "esrb_descriptors": game.esrb_descriptors
                 }
                 
                 # Add review data if available

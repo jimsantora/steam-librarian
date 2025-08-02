@@ -396,8 +396,8 @@ async def get_game_details(game_name: str, user: str = None) -> str:
                 cats = ", ".join(c.category_name for c in game.categories[:5])
                 response += f"- Categories: {cats}\n"
             
-            if game.maturity_rating:
-                response += f"- Maturity Rating: {game.maturity_rating}\n"
+            if game.esrb_rating:
+                response += f"- ESRB Rating: {game.esrb_rating}\n"
             
             if game.required_age and game.required_age > 0:
                 response += f"- Required Age: {game.required_age}+\n"

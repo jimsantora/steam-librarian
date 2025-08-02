@@ -119,7 +119,9 @@ Central table storing game metadata.
 | `app_id` | INTEGER (PK) | Steam application ID |
 | `name` | STRING | Game title |
 | `required_age` | INTEGER | Minimum age requirement from Steam API |
+| `short_description` | TEXT | Brief game description from Steam |
 | `detailed_description` | TEXT | Full game description from Steam |
+| `about_the_game` | TEXT | About the game section from Steam |
 | `recommendations_total` | INTEGER | Total user recommendations count |
 | `metacritic_score` | INTEGER | Metacritic review score (0-100) |
 | `metacritic_url` | STRING | Link to Metacritic review page |
@@ -262,6 +264,7 @@ Based on the migrated data:
 
 ### 1. **Rich Game Metadata**
 - Comprehensive game information from Steam Store API
+- Multiple description fields: short_description, detailed_description, and about_the_game
 - Official ESRB and PEGI ratings for content filtering
 - Platform compatibility and accessibility features
 - Metacritic scores and review data
@@ -298,7 +301,9 @@ Based on the migrated data:
 - **Removed**: `maturity_rating` column (replaced by official ESRB ratings)
 - **Removed**: `content_descriptors` column (was not populated by Steam API)
 - **Removed**: `steam_deck_verified` column (not available in public Steam API)
+- **Added**: `short_description` - Brief game descriptions from Steam
 - **Added**: `detailed_description` - Full game descriptions from Steam
+- **Added**: `about_the_game` - About the game section from Steam
 - **Added**: `recommendations_total` - User recommendation counts
 - **Added**: `metacritic_url` - Direct links to Metacritic reviews
 - **Added**: `header_image` - Game header image URLs

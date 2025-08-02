@@ -372,7 +372,7 @@ class SteamLibraryFetcher:
         # Progress indicator
         logger.info(f"Processing [{index}/{total}]: {name} (AppID: {appid}) - Fetching fresh data")
 
-        game_info = {"appid": appid, "name": name, "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "detailed_description": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
+        game_info = {"appid": appid, "name": name, "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "short_description": "", "detailed_description": "", "about_the_game": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
 
         # Get detailed app information
         app_details = self.get_app_details(appid)
@@ -383,8 +383,14 @@ class SteamLibraryFetcher:
             except (ValueError, TypeError):
                 game_info["required_age"] = 0
 
+            # Short description
+            game_info["short_description"] = app_details.get("short_description", "")
+            
             # Detailed description
             game_info["detailed_description"] = app_details.get("detailed_description", "")
+            
+            # About the game
+            game_info["about_the_game"] = app_details.get("about_the_game", "")
 
             # Recommendations total
             recommendations = app_details.get("recommendations", {})
@@ -467,7 +473,9 @@ class SteamLibraryFetcher:
                     app_id=app_id,
                     name=game_data["name"],
                     required_age=game_data.get("required_age", 0),
+                    short_description=game_data.get("short_description", ""),
                     detailed_description=game_data.get("detailed_description", ""),
+                    about_the_game=game_data.get("about_the_game", ""),
                     recommendations_total=game_data.get("recommendations_total", 0),
                     metacritic_score=game_data.get("metacritic_score", 0),
                     metacritic_url=game_data.get("metacritic_url", ""),
@@ -490,7 +498,9 @@ class SteamLibraryFetcher:
                 # Update existing game data only if we have fresh details
                 game.name = game_data["name"]
                 game.required_age = game_data.get("required_age", 0)
+                game.short_description = game_data.get("short_description", "")
                 game.detailed_description = game_data.get("detailed_description", "")
+                game.about_the_game = game_data.get("about_the_game", "")
                 game.recommendations_total = game_data.get("recommendations_total", 0)
                 game.metacritic_score = game_data.get("metacritic_score", 0)
                 game.metacritic_url = game_data.get("metacritic_url", "")
@@ -608,7 +618,7 @@ class SteamLibraryFetcher:
                 failed_count += 1
                 logger.error(f"Error processing game {game.get('name', 'Unknown')}: {e}")
                 # Still save basic info even if detailed processing fails
-                fallback_data = {"appid": game.get("appid"), "name": game.get("name", "Unknown"), "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "detailed_description": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
+                fallback_data = {"appid": game.get("appid"), "name": game.get("name", "Unknown"), "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "short_description": "", "detailed_description": "", "about_the_game": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
                 try:
                     self.save_to_database(fallback_data, steam_id)
                     processed_count += 1

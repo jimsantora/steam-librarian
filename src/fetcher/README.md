@@ -18,7 +18,7 @@ The Steam Library Fetcher is a comprehensive data collection module that retriev
 The fetcher extracts comprehensive game information from Steam's APIs:
 
 #### From Steam Store API (`appdetails`)
-- **Basic Info**: Game name, description, release date
+- **Basic Info**: Game name, short description, detailed description, about the game section, release date
 - **Media**: Header images and screenshots
 - **Platform Support**: Windows, macOS, Linux compatibility
 - **Ratings & Reviews**: ESRB/PEGI ratings with content descriptors
@@ -273,7 +273,7 @@ logger.error(f"Failed to process game {game_name}: {error}")
 ## Version History
 
 ### v1.1.3+ (Current)
-- **Enhanced Metadata**: Added detailed descriptions, recommendations, platform support
+- **Enhanced Metadata**: Added short descriptions, detailed descriptions, about the game sections, recommendations, platform support
 - **Official Ratings**: ESRB and PEGI rating extraction
 - **Accessibility**: Controller and VR support detection
 - **Media URLs**: Header images and Metacritic links
