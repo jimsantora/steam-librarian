@@ -15,16 +15,24 @@ Steam Library Database Schema
 ├─────────────────┤     ├─────────────────┤     ├─────────────────┤
 │ steam_id (PK)   │─┐   │ app_id (PK)     │──┬──│ app_id (PK,FK)  │
 │ persona_name    │ │   │ name            │  │  │ review_summary  │
-│ profile_url     │ │   │ maturity_rating │  │  │ review_score    │
-│ avatar_url      │ │   │ required_age    │  │  │ total_reviews   │
-│ avatarmedium    │ │   │ content_desc... │  │  │ positive_reviews│
-│ avatarfull      │ │   │ release_date    │  │  │ negative_reviews│
-│ time_created    │ │   │ metacritic_score│  │  │ last_updated    │
-│ loccountrycode  │ │   │ steam_deck_ver. │  │  └─────────────────┘
-│ locstatecode    │ │   │ controller_sup. │  │
-│ xp              │ │   │ vr_support      │  │
-│ steam_level     │ │   │ last_updated    │  │
-│ last_updated    │ │   └─────────────────┘  │
+│ profile_url     │ │   │ required_age    │  │  │ review_score    │
+│ avatar_url      │ │   │ detailed_desc.. │  │  │ total_reviews   │
+│ avatarmedium    │ │   │ recommen_total  │  │  │ positive_reviews│
+│ avatarfull      │ │   │ metacritic_score│  │  │ negative_reviews│
+│ time_created    │ │   │ metacritic_url  │  │  │ last_updated    │
+│ loccountrycode  │ │   │ header_image    │  │  └─────────────────┘
+│ locstatecode    │ │   │ platforms_win   │  │
+│ xp              │ │   │ platforms_mac   │  │
+│ steam_level     │ │   │ platforms_linux │  │
+│ last_updated    │ │   │ controller_sup. │  │
+└─────────────────┘ │   │ vr_support      │  │
+                    │   │ esrb_rating     │  │
+                    │   │ esrb_descrip... │  │
+                    │   │ pegi_rating     │  │
+                    │   │ pegi_descrip... │  │
+                    │   │ release_date    │  │
+                    │   │ last_updated    │  │
+                    │   └─────────────────┘  │
 └─────────────────┘ │                        │
          │          │                        │
          │          │   ┌─────────────────┐  │
@@ -110,14 +118,22 @@ Central table storing game metadata.
 |--------|------|-------------|
 | `app_id` | INTEGER (PK) | Steam application ID |
 | `name` | STRING | Game title |
-| `maturity_rating` | STRING | ESRB/age rating |
-| `required_age` | INTEGER | Minimum age requirement |
-| `content_descriptors` | TEXT | Content warnings/descriptors |
+| `required_age` | INTEGER | Minimum age requirement from Steam API |
+| `detailed_description` | TEXT | Full game description from Steam |
+| `recommendations_total` | INTEGER | Total user recommendations count |
+| `metacritic_score` | INTEGER | Metacritic review score (0-100) |
+| `metacritic_url` | STRING | Link to Metacritic review page |
+| `header_image` | STRING | URL to game's header image |
+| `platforms_windows` | BOOLEAN | Windows platform compatibility |
+| `platforms_mac` | BOOLEAN | macOS platform compatibility |
+| `platforms_linux` | BOOLEAN | Linux platform compatibility |
+| `controller_support` | STRING | Controller support level ("full", "partial", etc.) |
+| `vr_support` | BOOLEAN | VR compatibility (detected from categories) |
+| `esrb_rating` | STRING | ESRB rating ("E", "T", "M", etc.) |
+| `esrb_descriptors` | TEXT | ESRB content descriptors |
+| `pegi_rating` | STRING | PEGI age rating ("3", "7", "12", "16", "18") |
+| `pegi_descriptors` | TEXT | PEGI content descriptors |
 | `release_date` | STRING | Game release date |
-| `metacritic_score` | INTEGER | Metacritic review score |
-| `steam_deck_verified` | BOOLEAN | Steam Deck compatibility |
-| `controller_support` | STRING | Controller support level |
-| `vr_support` | BOOLEAN | VR compatibility |
 | `last_updated` | INTEGER | Unix timestamp of last update |
 
 #### `user_games`
@@ -220,7 +236,7 @@ The following indexes are automatically created for performance optimization:
 ```sql
 -- Game indexes
 CREATE INDEX idx_games_name ON games(name);
-CREATE INDEX idx_games_maturity_rating ON games(maturity_rating);
+CREATE INDEX idx_games_esrb_rating ON games(esrb_rating);
 
 -- User games indexes
 CREATE INDEX idx_user_games_steam_id ON user_games(steam_id);
@@ -244,27 +260,51 @@ Based on the migrated data:
 
 ## Design Benefits
 
-### 1. **Eliminates Redundancy**
+### 1. **Rich Game Metadata**
+- Comprehensive game information from Steam Store API
+- Official ESRB and PEGI ratings for content filtering
+- Platform compatibility and accessibility features
+- Metacritic scores and review data
+
+### 2. **Eliminates Redundancy**
 - No duplicate genre/developer names across games
 - Normalized metadata reduces storage requirements
 
-### 2. **Enforces Data Integrity**
+### 3. **Enforces Data Integrity**
 - Foreign key relationships prevent orphaned records
 - ACID compliance ensures consistent data state
 
-### 3. **Enables Complex Queries**
-- Easy to find games by multiple criteria
+### 4. **Enables Complex Queries**
+- Easy to find games by multiple criteria (ratings, platforms, VR support)
 - Efficient joins for comprehensive game data
+- Advanced filtering by accessibility features
 
-### 4. **Supports Multiple Users**
+### 5. **Supports Multiple Users**
 - Can track multiple Steam accounts
 - User-specific playtime and ownership data
 
-### 5. **Optimized for Performance**
+### 6. **Optimized for Performance**
 - Proper indexing on frequently queried fields
 - Efficient many-to-many relationships
 
-### 6. **Future Extensibility**
+### 7. **Future Extensibility**
 - Easy to add new game metadata
 - Support for additional user data
 - Historical tracking capabilities
+
+## Recent Schema Updates
+
+### Version 1.1.3+ Changes
+- **Removed**: `maturity_rating` column (replaced by official ESRB ratings)
+- **Removed**: `content_descriptors` column (was not populated by Steam API)
+- **Removed**: `steam_deck_verified` column (not available in public Steam API)
+- **Added**: `detailed_description` - Full game descriptions from Steam
+- **Added**: `recommendations_total` - User recommendation counts
+- **Added**: `metacritic_url` - Direct links to Metacritic reviews
+- **Added**: `header_image` - Game header image URLs
+- **Added**: `platforms_windows/mac/linux` - Platform-specific compatibility
+- **Added**: `esrb_rating/descriptors` - Official ESRB rating data
+- **Added**: `pegi_rating/descriptors` - Official PEGI rating data
+- **Enhanced**: `controller_support` - Now populated from Steam API
+- **Enhanced**: `vr_support` - Detected from Steam categories
+- **Updated**: Index from `maturity_rating` to `esrb_rating`

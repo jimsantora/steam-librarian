@@ -1,4 +1,11 @@
 services:
+  # Volume permissions fixer - ensures nobody user can write to the volume
+  volume-permissions:
+    image: alpine:latest
+    volumes:
+      - steam-data:/data
+    command: ["chown", "-R", "65534:65534", "/data"]
+    
   # Steam Library Fetcher - runs periodically to update data
   fetcher:
     build:
@@ -13,6 +20,8 @@ services:
       - steam-data:/data
     restart: "no"
     command: ["python", "src/fetcher/steam_library_fetcher.py"]
+    depends_on:
+      - volume-permissions
 
   # MCP Server - provides the MCP interface
   mcp-server:
@@ -21,19 +30,17 @@ services:
       dockerfile: deploy/docker/Dockerfile.mcp_server
     environment:
       - DATABASE_URL=sqlite:////data/steam_library.db
-      - HOST=0.0.0.0
-      - PORT=8000
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
       - DEBUG=false
-      - LOG_LEVEL=INFO
-      - ENABLE_CACHE=true
-      - CACHE_TTL=3600
-      - STEAM_ID=${STEAM_ID}  # Optional fallback
+      - DEFAULT_USER=default
     volumes:
       - steam-data:/data
     ports:
       - "8000:8000"
     restart: unless-stopped
     depends_on:
+      - volume-permissions
       - fetcher
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -55,6 +62,8 @@ services:
     volumes:
       - steam-data:/data
     restart: unless-stopped
+    depends_on:
+      - volume-permissions
     entrypoint: ["/bin/sh", "-c"]
     command: 
       - |

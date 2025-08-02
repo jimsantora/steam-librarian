@@ -143,14 +143,22 @@ class Game(Base):
 
     app_id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    maturity_rating = Column(String)
     required_age = Column(Integer, default=0)
-    content_descriptors = Column(Text)
-    release_date = Column(String)
+    detailed_description = Column(Text)
+    recommendations_total = Column(Integer)
     metacritic_score = Column(Integer)
-    steam_deck_verified = Column(Boolean, default=False)
+    metacritic_url = Column(String)
+    header_image = Column(String)
+    platforms_windows = Column(Boolean, default=False)
+    platforms_mac = Column(Boolean, default=False)
+    platforms_linux = Column(Boolean, default=False)
     controller_support = Column(String)
     vr_support = Column(Boolean, default=False)
+    esrb_rating = Column(String)
+    esrb_descriptors = Column(Text)
+    pegi_rating = Column(String)
+    pegi_descriptors = Column(Text)
+    release_date = Column(String)
     last_updated = Column(Integer, default=lambda: int(datetime.now().timestamp()))
 
     # Relationships
@@ -164,7 +172,7 @@ class Game(Base):
     # Indexes for search and filtering
     __table_args__ = (
         Index("idx_games_name", "name"),
-        Index("idx_games_maturity_rating", "maturity_rating"),
+        Index("idx_games_esrb_rating", "esrb_rating"),
     )
 
 

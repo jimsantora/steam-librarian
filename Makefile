@@ -1,4 +1,4 @@
-.PHONY: help build-docker run-docker stop-docker helm-install helm-uninstall lint format-check format test test-unit test-integration test-full check check-full clean
+.PHONY: help build-docker run-docker stop-docker rebuild-mcp-docker helm-install helm-uninstall lint format-check format test test-unit test-integration test-full check check-full clean
 
 # Default target
 help:
@@ -6,6 +6,8 @@ help:
 	@echo "  make build-docker    - Build Docker images"
 	@echo "  make run-docker      - Run with Docker Compose"
 	@echo "  make stop-docker     - Stop Docker Compose"
+	@echo "  make rebuild-mcp-docker - Stop, rebuild MCP server without cache, and run"
+	@echo "  make rebuild-all-docker - Stop, rebuild all containers without cache, and run"
 	@echo "  make helm-install    - Install with Helm (requires values-override.yaml)"
 	@echo "  make helm-uninstall  - Uninstall Helm release"
 	@echo "  make helm-lint       - Lint Helm chart"
@@ -33,6 +35,21 @@ run-docker:
 stop-docker:
 	@echo "Stopping services..."
 	cd deploy/docker && docker-compose down
+
+rebuild-mcp-docker:
+	@echo "Stopping services, cleaning images, rebuilding MCP server, and restarting..."
+	cd deploy/docker && docker-compose down
+	docker image prune -a -f
+	docker build --no-cache --pull -f deploy/docker/Dockerfile.mcp_server -t steam-librarian-mcp-server:latest .
+	cd deploy/docker && docker-compose up -d mcp-server
+
+rebuild-all-docker:
+	@echo "Stopping services, cleaning images, rebuilding MCP server, and restarting..."
+	cd deploy/docker && docker-compose down
+	docker image prune -a -f
+	docker build --no-cache --pull -f deploy/docker/Dockerfile.fetcher -t steam-librarian-fetcher:latest .
+	docker build --no-cache --pull -f deploy/docker/Dockerfile.mcp_server -t steam-librarian-mcp-server:latest .
+	cd deploy/docker && docker-compose up -d 
 
 # Helm targets
 helm-lint:
