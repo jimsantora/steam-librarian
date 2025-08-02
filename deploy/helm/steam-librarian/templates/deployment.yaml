@@ -75,41 +75,14 @@ spec:
         env:
         - name: DATABASE_URL
           value: "sqlite:////data/steam_library.db"
-        - name: HOST
+        - name: MCP_HOST
           value: "0.0.0.0"
-        - name: PORT
+        - name: MCP_PORT
           value: "{{ .Values.mcpServer.service.targetPort }}"
         - name: DEBUG
           value: "{{ .Values.mcpServer.debug | default false }}"
-        - name: LOG_LEVEL
-          value: "{{ .Values.mcpServer.logLevel | default "INFO" }}"
-        - name: ENABLE_CACHE
-          value: "{{ .Values.mcpServer.cache.enabled | default true }}"
-        - name: CACHE_TTL
-          value: "{{ .Values.mcpServer.cache.ttl | default 3600 }}"
-        - name: CACHE_TTL_SEARCH
-          value: "{{ .Values.mcpServer.cache.searchTtl | default 900 }}"
-        - name: CACHE_TTL_RECOMMENDATIONS
-          value: "{{ .Values.mcpServer.cache.recommendationsTtl | default 3600 }}"
-        - name: CACHE_MAX_SIZE
-          value: "{{ .Values.mcpServer.cache.maxSize | default 1000 }}"
-        - name: ENABLE_NL_SEARCH
-          value: "{{ .Values.mcpServer.features.naturalLanguageSearch | default true }}"
-        - name: ENABLE_RECOMMENDATIONS
-          value: "{{ .Values.mcpServer.features.recommendations | default true }}"
-        - name: ENABLE_FRIENDS_DATA
-          value: "{{ .Values.mcpServer.features.friendsData | default true }}"
-        - name: MAX_SEARCH_RESULTS
-          value: "{{ .Values.mcpServer.performance.maxSearchResults | default 50 }}"
-        - name: MAX_RECOMMENDATIONS
-          value: "{{ .Values.mcpServer.performance.maxRecommendations | default 10 }}"
-        - name: REQUEST_TIMEOUT
-          value: "{{ .Values.mcpServer.performance.requestTimeout | default 30 }}"
-        - name: STEAM_ID
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "steam-librarian.secretName" . }}
-              key: {{ .Values.steam.existingSecretKeys.steamId }}
+        - name: DEFAULT_USER
+          value: "{{ .Values.mcpServer.defaultUser | default "default" }}"
         volumeMounts:
         - name: data
           mountPath: /data

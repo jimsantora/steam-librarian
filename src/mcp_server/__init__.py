@@ -1,3 +1,3 @@
-"""Steam Librarian MCP Server - Your Intelligent Gaming Companion"""
+"""Simplified Steam Librarian MCP Server"""
 
-__version__ = "2.0.0"
+__version__ = "1.1.2"

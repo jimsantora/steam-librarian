@@ -132,27 +132,7 @@ mcpServer:
 
   # MCP Server Configuration
   debug: false
-  logLevel: "INFO"
-  
-  # Caching configuration
-  cache:
-    enabled: true
-    ttl: 3600
-    searchTtl: 900
-    recommendationsTtl: 3600
-    maxSize: 1000
-  
-  # Feature flags
-  features:
-    naturalLanguageSearch: true
-    recommendations: true
-    friendsData: true
-  
-  # Performance settings
-  performance:
-    maxSearchResults: 50
-    maxRecommendations: 10
-    requestTimeout: 30
+  defaultUser: "default"
 
 # Persistent Volume Configuration
 persistence:
