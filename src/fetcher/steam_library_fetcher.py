@@ -385,22 +385,22 @@ class SteamLibraryFetcher:
 
             # Short description
             game_info["short_description"] = app_details.get("short_description", "")
-            
+
             # Detailed description
             game_info["detailed_description"] = app_details.get("detailed_description", "")
-            
+
             # About the game
             game_info["about_the_game"] = app_details.get("about_the_game", "")
 
-            # Recommendations total
-            recommendations = app_details.get("recommendations", {})
+            # Recommendations total - handle None values
+            recommendations = app_details.get("recommendations") or {}
             try:
                 game_info["recommendations_total"] = int(recommendations.get("total", 0))
             except (ValueError, TypeError):
                 game_info["recommendations_total"] = 0
 
-            # Metacritic data
-            metacritic = app_details.get("metacritic", {})
+            # Metacritic data - handle None values
+            metacritic = app_details.get("metacritic") or {}
             try:
                 game_info["metacritic_score"] = int(metacritic.get("score", 0))
             except (ValueError, TypeError):
@@ -410,8 +410,8 @@ class SteamLibraryFetcher:
             # Header image
             game_info["header_image"] = app_details.get("header_image", "")
 
-            # Platforms
-            platforms = app_details.get("platforms", {})
+            # Platforms - handle None values
+            platforms = app_details.get("platforms") or {}
             game_info["platforms_windows"] = platforms.get("windows", False)
             game_info["platforms_mac"] = platforms.get("mac", False)
             game_info["platforms_linux"] = platforms.get("linux", False)
@@ -419,34 +419,34 @@ class SteamLibraryFetcher:
             # Controller support
             game_info["controller_support"] = app_details.get("controller_support", "")
 
-            # VR support (check categories for ID 31)
-            categories = app_details.get("categories", [])
-            game_info["vr_support"] = any(cat.get("id") == 31 for cat in categories)
+            # VR support (check categories for ID 31) - handle None values
+            categories = app_details.get("categories") or []
+            game_info["vr_support"] = any(cat.get("id") == 31 for cat in categories if cat)
 
-            # ESRB rating
-            ratings = app_details.get("ratings", {})
-            esrb = ratings.get("esrb", {})
+            # ESRB rating - handle None values
+            ratings = app_details.get("ratings") or {}
+            esrb = ratings.get("esrb") or {}
             game_info["esrb_rating"] = esrb.get("rating", "")
             game_info["esrb_descriptors"] = esrb.get("descriptors", "")
 
-            # PEGI rating
-            pegi = ratings.get("pegi", {})
+            # PEGI rating - handle None values
+            pegi = ratings.get("pegi") or {}
             game_info["pegi_rating"] = pegi.get("rating", "")
             game_info["pegi_descriptors"] = pegi.get("descriptors", "")
 
-            # Genres
-            genres = app_details.get("genres", [])
-            game_info["genres"] = ", ".join([g.get("description", "") for g in genres])
+            # Genres - handle None values
+            genres = app_details.get("genres") or []
+            game_info["genres"] = ", ".join([g.get("description", "") for g in genres if g])
 
-            # Categories (as string for existing functionality)
-            game_info["categories"] = ", ".join([c.get("description", "") for c in categories])
+            # Categories (as string for existing functionality) - handle None values
+            game_info["categories"] = ", ".join([c.get("description", "") for c in categories if c])
 
-            # Developers and Publishers
-            game_info["developers"] = ", ".join(app_details.get("developers", []))
-            game_info["publishers"] = ", ".join(app_details.get("publishers", []))
+            # Developers and Publishers - handle None values
+            game_info["developers"] = ", ".join(app_details.get("developers") or [])
+            game_info["publishers"] = ", ".join(app_details.get("publishers") or [])
 
-            # Release date
-            release_date = app_details.get("release_date", {})
+            # Release date - handle None values
+            release_date = app_details.get("release_date") or {}
             game_info["release_date"] = release_date.get("date", "")
 
         # Get review information
