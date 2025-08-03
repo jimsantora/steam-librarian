@@ -1,6 +1,7 @@
 """Steam Librarian MCP Server - Simplified HTTP Streaming Implementation"""
 
 import logging
+
 from mcp.server.fastmcp import FastMCP
 from mcp.types import (
     Completion,
@@ -37,7 +38,7 @@ async def health_check(request: Request) -> PlainTextResponse:
         # Test basic database connection
         with engine.connect() as conn:
             conn.execute(text("SELECT 1")).fetchone()
-        
+
         return PlainTextResponse("OK")
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -51,7 +52,7 @@ async def health_detailed(request: Request) -> JSONResponse:
         # Test database connection
         with engine.connect() as conn:
             conn.execute(text("SELECT 1")).fetchone()
-        
+
         health_info = {
             "status": "healthy",
             "server": "steam-librarian-simplified",
@@ -60,7 +61,7 @@ async def health_detailed(request: Request) -> JSONResponse:
             "version": "1.1.2",
             "database": "connected"
         }
-        
+
         return JSONResponse(health_info)
     except Exception as e:
         logger.error(f"Detailed health check failed: {e}")
@@ -80,21 +81,21 @@ async def handle_completion(
     context: CompletionContext | None = None,
 ) -> Completion | None:
     """Provide basic completions for Steam Librarian."""
-    
+
     # Simple hardcoded completions
     if argument.name in ["query", "search", "game", "games"]:
         games = ["Portal", "Half-Life", "Team Fortress", "Counter-Strike", "Dota 2"]
         matching = [g for g in games if g.lower().startswith(argument.value.lower())]
         return Completion(values=matching, hasMore=False)
-    
+
     elif argument.name in ["genre", "genres"]:
         genres = ["Action", "Adventure", "RPG", "Strategy", "Simulation", "Sports"]
         matching = [g for g in genres if g.lower().startswith(argument.value.lower())]
         return Completion(values=matching, hasMore=False)
-    
+
     elif argument.name in ["user", "username"]:
         # Use default user as completion
         if config.default_user.startswith(argument.value):
             return Completion(values=[config.default_user], hasMore=False)
-    
+
     return None

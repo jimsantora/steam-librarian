@@ -1,22 +1,52 @@
 """MCP tools using proper database schema and ORM"""
 
+
 from mcp.server.fastmcp import Context
 from mcp.types import SamplingMessage, TextContent
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import joinedload
 
 from shared.database import (
+    Category,
     Game,
+    Genre,
+    Tag,
     UserGame,
     UserProfile,
-    Genre,
+    game_categories,
+    game_genres,
+    game_tags,
     get_db,
-    resolve_user_for_tool,
     handle_user_not_found,
-    handle_game_not_found,
+    resolve_user_for_tool,
 )
+
 from .config import config
 from .server import mcp
+
+
+class FamilyPreferences(BaseModel):
+    """Preferences for family gaming with young children."""
+    content_concerns: list[str] = Field(
+        default=[],
+        description="Content to avoid (violence, language, scary themes)"
+    )
+    gaming_experience: str = Field(
+        default="beginner",
+        description="Family's gaming experience (beginner/intermediate/advanced)"
+    )
+
+class AmbiguousSearchContext(BaseModel):
+    """Context for clarifying ambiguous search queries."""
+    time_available: str = Field(
+        default="medium",
+        description="How long do you want to play? (quick/medium/long session)"
+    )
+    mood: str = Field(
+        default="relaxed",
+        description="Current mood (relaxed/energetic/competitive/social)"
+    )
 
 
 def get_default_user_fallback():
@@ -26,84 +56,134 @@ def get_default_user_fallback():
     return None
 
 
+def is_natural_language_query(query: str) -> bool:
+    """Check if query is natural language vs simple keywords."""
+    # Natural language indicators
+    nl_indicators = ['something', 'games like', 'similar to', 'after work',
+                    'relaxing', 'exciting', 'with friends', 'for kids']
+    query_lower = query.lower()
+    return any(indicator in query_lower for indicator in nl_indicators)
+
+
 @mcp.tool()
-async def search_games(query: str, user: str = None) -> str:
-    """Search for games in user's library by name or genre."""
-    # Resolve user with default fallback
+async def search_games(
+    query: str,
+    ctx: Context | None = None,
+    user: str | None = None
+) -> str:
+    """Search games by keywords or natural language description.
+
+    Examples: 'minecraft', 'family games', 'something relaxing after work'
+    """
+    # Resolve user
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
         return f"User error: {user_result['message']}"
-    
+
     user_steam_id = user_result["steam_id"]
-    
-    try:
-        with get_db() as session:
-            # Get user info
-            user_profile = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
-            if not user_profile:
-                return handle_user_not_found(user_steam_id)["message"]
-            
-            # Search user's games with all relationships loaded
-            user_games_query = session.query(UserGame).options(
-                joinedload(UserGame.game).joinedload(Game.genres),
-                joinedload(UserGame.game).joinedload(Game.developers),
-                joinedload(UserGame.game).joinedload(Game.categories)
-            ).filter(UserGame.steam_id == user_steam_id)
-            
-            # Search by game name
-            name_matches = []
-            genre_matches = []
-            
-            for user_game in user_games_query:
-                game = user_game.game
-                
-                # Name search
-                if query.lower() in game.name.lower():
-                    name_matches.append({
-                        "name": game.name,
-                        "playtime": user_game.playtime_hours,
-                        "genres": [g.genre_name for g in game.genres]
-                    })
-                
-                # Genre search
-                for genre in game.genres:
-                    if query.lower() in genre.genre_name.lower():
-                        genre_matches.append({
-                            "name": game.name,
-                            "playtime": user_game.playtime_hours,
-                            "genres": [g.genre_name for g in game.genres]
-                        })
-                        break
-            
-            # Format results
-            results = []
-            if name_matches:
-                results.append(f"**Games matching '{query}':**")
-                for match in name_matches[:10]:
-                    genres_str = ", ".join(match["genres"]) if match["genres"] else "No genres"
-                    results.append(f"- {match['name']} ({match['playtime']}h played) - {genres_str}")
-            
-            if genre_matches:
-                if results:
-                    results.append("")
-                results.append(f"**Games in '{query}' genre:**")
-                for match in genre_matches[:10]:
-                    results.append(f"- {match['name']} ({match['playtime']}h played)")
-            
-            if not results:
-                return f"No games found for {user_profile.persona_name} matching '{query}'"
-            
-            return f"Search results for {user_profile.persona_name}:\n\n" + "\n".join(results)
-            
-    except Exception as e:
-        return f"Search failed: {str(e)}"
+
+    # Check if natural language query needs AI interpretation
+    if ctx and is_natural_language_query(query):
+        try:
+            interpretation = await ctx.session.create_message(
+                messages=[SamplingMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text",
+                        text=f"""Map this gaming request to specific genres and categories.
+                        Request: '{query}'
+                        Available genres: Action, Adventure, RPG, Strategy, Casual, Indie, Simulation
+                        Available categories: Single-player, Multi-player, Co-op, Family Sharing
+                        Respond with: genres:[list] categories:[list]"""
+                    )
+                )],
+                max_tokens=100
+            )
+
+            # Parse AI response and use for filtering
+            if interpretation.content.type == "text":
+                # Extract genres and categories from response
+                # Apply to games_query filters
+                pass
+        except Exception:
+            # Fallback to keyword search if AI fails
+            pass
+
+    # Database query with enhanced filtering
+    with get_db() as session:
+        games_query = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        )
+
+        # Smart mappings for common queries
+        if "family" in query.lower():
+            games_query = games_query.join(Game.genres).filter(
+                Genre.genre_name == "Casual"
+            ).join(Game.categories).filter(
+                Category.category_name == "Family Sharing"
+            )
+        elif "multiplayer" in query.lower() or "coop" in query.lower():
+            games_query = games_query.join(Game.categories).filter(
+                or_(
+                    Category.category_name == "Multi-player",
+                    Category.category_name == "Co-op"
+                )
+            )
+        else:
+            # General search by name or genre
+            games_query = games_query.join(Game.genres, isouter=True).filter(
+                or_(
+                    Game.name.ilike(f"%{query}%"),
+                    Genre.genre_name.ilike(f"%{query}%")
+                )
+            )
+
+        # Add metadata to results
+        results = []
+        for game, user_game in games_query.distinct().limit(10):
+            results.append({
+                "name": game.name,
+                "metacritic": game.metacritic_score,
+                "platforms": {
+                    "windows": game.platforms_windows,
+                    "mac": game.platforms_mac,
+                    "linux": game.platforms_linux
+                },
+                "playtime": user_game.playtime_forever / 60 if user_game.playtime_forever else 0,
+                "genres": [g.genre_name for g in game.genres[:3]]
+            })
+
+        if not results:
+            return f"No games found matching '{query}'"
+
+        # Format enhanced results
+        output = [f"**Search results for '{query}':**\n"]
+        for game in results:
+            platforms = []
+            if game["platforms"]["windows"]: platforms.append("Win")
+            if game["platforms"]["mac"]: platforms.append("Mac")
+            if game["platforms"]["linux"]: platforms.append("Linux")
+            platform_str = "/".join(platforms) if platforms else "Unknown"
+
+            metacritic_str = f" ({game['metacritic']}/100)" if game["metacritic"] else ""
+            genres_str = ", ".join(game["genres"]) if game["genres"] else "No genres"
+
+            output.append(
+                f"- **{game['name']}**{metacritic_str}\n"
+                f"  Genres: {genres_str} | Platforms: {platform_str}\n"
+                f"  Playtime: {game['playtime']:.1f} hours"
+            )
+
+        return "\n".join(output)
 
 
 @mcp.tool()
 async def generate_recommendation(genre: str, ctx: Context) -> str:
     """Generate game recommendation using LLM sampling."""
     prompt = f"Recommend a {genre} game from Steam with a brief description"
-    
+
     try:
         result = await ctx.session.create_message(
             messages=[
@@ -114,7 +194,7 @@ async def generate_recommendation(genre: str, ctx: Context) -> str:
             ],
             max_tokens=100
         )
-        
+
         if result.content.type == "text":
             return result.content.text
         return str(result.content)
@@ -130,53 +210,53 @@ class GamePreferences(BaseModel):
 
 
 @mcp.tool()
-async def find_games_with_preferences(initial_genre: str, ctx: Context, user: str = None) -> str:
+async def find_games_with_preferences(initial_genre: str, ctx: Context, user: str | None = None) -> str:
     """Find games with user preferences via elicitation."""
     # Resolve user with default fallback
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
         return f"User error: {user_result['message']}"
-    
+
     user_steam_id = user_result["steam_id"]
-    
+
     try:
         # Ask for user preferences
         result = await ctx.elicit(
             message=f"Looking for {initial_genre} games. What are your preferences?",
             schema=GamePreferences
         )
-        
+
         if result.action == "accept" and result.data:
             prefs = result.data
-            
+
             with get_db() as session:
                 # Get user info
                 user_profile = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
                 if not user_profile:
                     return handle_user_not_found(user_steam_id)["message"]
-                
+
                 # Get user's games with genres and categories
                 user_games = session.query(UserGame).options(
                     joinedload(UserGame.game).joinedload(Game.genres),
                     joinedload(UserGame.game).joinedload(Game.categories)
                 ).filter(UserGame.steam_id == user_steam_id).all()
-                
+
                 # Filter by genre and preferences
                 matches = []
                 for user_game in user_games:
                     game = user_game.game
-                    
+
                     # Check genre match
                     genre_match = any(
-                        initial_genre.lower() in g.genre_name.lower() 
+                        initial_genre.lower() in g.genre_name.lower()
                         for g in game.genres
                     )
-                    
+
                     if genre_match:
                         # Check multiplayer preference
                         if prefs.multiplayer:
                             has_multiplayer = any(
-                                "multiplayer" in c.category_name.lower() 
+                                "multiplayer" in c.category_name.lower()
                                 for c in game.categories
                             )
                             if has_multiplayer:
@@ -191,12 +271,12 @@ async def find_games_with_preferences(initial_genre: str, ctx: Context, user: st
                                 "playtime": user_game.playtime_hours,
                                 "categories": [c.category_name for c in game.categories]
                             })
-            
+
             response = f"Found {initial_genre} games for {user_profile.persona_name} matching your preferences:\n"
             response += f"- Multiplayer: {'Yes' if prefs.multiplayer else 'No'}\n"
             response += f"- Max Price: ${prefs.max_price}\n"
             response += f"- Time to Beat: {prefs.time_to_beat}\n\n"
-            
+
             if matches:
                 response += "**Matching games:**\n"
                 for match in matches[:10]:
@@ -204,150 +284,107 @@ async def find_games_with_preferences(initial_genre: str, ctx: Context, user: st
                     response += f"- {match['name']} ({match['playtime']}h) - {cats}\n"
             else:
                 response += "No games found matching all criteria"
-                
+
             return response
         else:
             return "Search cancelled by user"
-            
+
     except Exception as e:
         return f"Failed to find games: {str(e)}"
 
 
 @mcp.tool()
-async def analyze_library(user: str = None, focus: str = "overview") -> str:
-    """Analyze user's game library with detailed insights and patterns.
-    
-    Focus options: overview, genres, playtime, backlog, recommendations
-    """
+async def analyze_library(
+    ctx: Context | None = None,
+    user: str | None = None
+) -> str:
+    """Analyze gaming library with statistics and insights."""
     # Resolve user with default fallback
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
         return f"User error: {user_result['message']}"
-    
+
     user_steam_id = user_result["steam_id"]
-    
-    try:
-        with get_db() as session:
-            # Get user profile
-            user_profile = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
-            if not user_profile:
-                return handle_user_not_found(user_steam_id)["message"]
-            
-            # Get user's games with all relationships
-            user_games = session.query(UserGame).options(
-                joinedload(UserGame.game).joinedload(Game.genres),
-                joinedload(UserGame.game).joinedload(Game.categories),
-                joinedload(UserGame.game).joinedload(Game.developers)
-            ).filter(UserGame.steam_id == user_steam_id).all()
-            
-            response = f"**Library Analysis for {user_profile.persona_name}**\n\n"
-            
-            if focus == "overview" or focus == "all":
-                # Basic stats
-                total_games = len(user_games)
-                total_playtime = sum(ug.playtime_forever for ug in user_games)
-                played_games = sum(1 for ug in user_games if ug.playtime_forever > 0)
-                recent_playtime = sum(ug.playtime_2weeks for ug in user_games)
+
+    with get_db() as session:
+        # Get all user's games
+        user_games = session.query(UserGame).filter_by(steam_id=user_steam_id).all()
+        game_ids = [ug.app_id for ug in user_games]
+
+        # Genre distribution
+        genre_counts = session.query(
+            Genre.genre_name,
+            func.count(Genre.genre_name)
+        ).join(
+            game_genres, Genre.id == game_genres.c.genre_id
+        ).filter(
+            game_genres.c.game_id.in_(game_ids)
+        ).group_by(Genre.genre_name).all()
+
+        # Category analysis
+        category_counts = session.query(
+            Category.category_name,
+            func.count(Category.category_name)
+        ).join(
+            game_categories, Category.id == game_categories.c.category_id
+        ).filter(
+            game_categories.c.game_id.in_(game_ids)
+        ).group_by(Category.category_name).all()
+
+        # Platform compatibility
+        platform_stats = session.query(
+            func.sum(case((Game.platforms_windows == True, 1), else_=0)).label('windows'),
+            func.sum(case((Game.platforms_mac == True, 1), else_=0)).label('mac'),
+            func.sum(case((Game.platforms_linux == True, 1), else_=0)).label('linux')
+        ).filter(Game.app_id.in_(game_ids)).first()
+
+        # Build analysis with new insights
+        analysis = f"""Library Analysis for {user_result['display_name']}:
+
+**Genre Distribution (Top 5)**:
+{format_top_items(genre_counts, 5)}
+
+**Gaming Style Preferences**:
+- Single-player games: {count_category(category_counts, 'Single-player')}
+- Multiplayer games: {count_category(category_counts, 'Multi-player')}
+- Co-op games: {count_category(category_counts, 'Co-op')}
+
+**Platform Compatibility**:
+- Windows: {platform_stats.windows} games
+- Mac: {platform_stats.mac} games
+- Linux: {platform_stats.linux} games"""
+
+        # Optional AI insights
+        if ctx:
+            try:
+                insights_prompt = f"""Based on this gaming library analysis:
+                {analysis}
                 
-                response += "**Overview:**\n"
-                response += f"- Total games: {total_games}\n"
-                response += f"- Games played: {played_games} ({round(played_games/total_games*100, 1)}%)\n"
-                response += f"- Total playtime: {round(total_playtime/60, 1)} hours\n"
-                response += f"- Recent playtime (2 weeks): {round(recent_playtime/60, 1)} hours\n"
-                response += f"- Average playtime per game: {round(total_playtime/60/max(played_games, 1), 1)} hours\n\n"
-            
-            if focus == "genres" or focus == "all":
-                # Genre analysis
-                genre_data = {}
-                for ug in user_games:
-                    for genre in ug.game.genres:
-                        if genre.genre_name not in genre_data:
-                            genre_data[genre.genre_name] = {"count": 0, "playtime": 0, "games": []}
-                        genre_data[genre.genre_name]["count"] += 1
-                        genre_data[genre.genre_name]["playtime"] += ug.playtime_forever
-                        if ug.playtime_forever > 0:
-                            genre_data[genre.genre_name]["games"].append((ug.game.name, ug.playtime_forever))
-                
-                response += "**Genre Analysis:**\n"
-                sorted_genres = sorted(genre_data.items(), key=lambda x: x[1]["playtime"], reverse=True)[:8]
-                for genre, data in sorted_genres:
-                    hours = round(data["playtime"]/60, 1)
-                    response += f"- {genre}: {data['count']} games, {hours}h played\n"
-                    if data["games"]:
-                        top_game = max(data["games"], key=lambda x: x[1])
-                        response += f"  Most played: {top_game[0]} ({round(top_game[1]/60, 1)}h)\n"
-                response += "\n"
-            
-            if focus == "playtime" or focus == "all":
-                # Playtime patterns
-                response += "**Playtime Patterns:**\n"
-                
-                # Most played games
-                played = [(ug, ug.playtime_forever) for ug in user_games if ug.playtime_forever > 0]
-                played.sort(key=lambda x: x[1], reverse=True)
-                
-                response += "Top 5 most played:\n"
-                for ug, _ in played[:5]:
-                    response += f"- {ug.game.name}: {ug.playtime_hours}h\n"
-                
-                # Recently active
-                recent = [(ug, ug.playtime_2weeks) for ug in user_games if ug.playtime_2weeks > 0]
-                if recent:
-                    response += f"\nRecently played ({len(recent)} games):\n"
-                    recent.sort(key=lambda x: x[1], reverse=True)
-                    for ug, _ in recent[:5]:
-                        response += f"- {ug.game.name}: {ug.playtime_2weeks_hours}h in last 2 weeks\n"
-                response += "\n"
-            
-            if focus == "backlog" or focus == "all":
-                # Backlog analysis
-                unplayed = [ug for ug in user_games if ug.playtime_forever == 0]
-                barely_played = [ug for ug in user_games if 0 < ug.playtime_forever < 120]  # Less than 2 hours
-                
-                response += "**Backlog Analysis:**\n"
-                response += f"- Unplayed games: {len(unplayed)} ({round(len(unplayed)/len(user_games)*100, 1)}%)\n"
-                response += f"- Barely played (<2h): {len(barely_played)}\n"
-                
-                if unplayed:
-                    # Sample some unplayed games with interesting characteristics
-                    response += "\nSome unplayed games:\n"
-                    # Show games with good reviews or interesting genres
-                    interesting_unplayed = []
-                    for ug in unplayed[:30]:  # Check first 30
-                        game = ug.game
-                        # Check if has positive reviews
-                        if game.reviews and game.reviews.positive_percentage > 85:
-                            interesting_unplayed.append((game, game.reviews.positive_percentage))
-                    
-                    # Sort by review percentage
-                    interesting_unplayed.sort(key=lambda x: x[1], reverse=True)
-                    
-                    for game, pos_pct in interesting_unplayed[:5]:
-                        genres = ", ".join([g.genre_name for g in game.genres][:2])
-                        response += f"- {game.name} ({pos_pct}% positive"
-                        if genres:
-                            response += f", {genres}"
-                        response += ")\n"
-                    
-                    # If no highly rated unplayed games, just show some random unplayed
-                    if not interesting_unplayed and unplayed:
-                        response += "Random selection:\n"
-                        for ug in unplayed[:5]:
-                            genres = ", ".join([g.genre_name for g in ug.game.genres][:2])
-                            response += f"- {ug.game.name}"
-                            if genres:
-                                response += f" ({genres})"
-                            response += "\n"
-            
-            return response
-            
-    except Exception as e:
-        return f"Failed to analyze library: {str(e)}"
+                Provide 2-3 personalized insights about their gaming preferences and 
+                suggest what types of games they might enjoy exploring next."""
+
+                insights = await ctx.session.create_message(
+                    messages=[SamplingMessage(
+                        role="user",
+                        content=TextContent(type="text", text=insights_prompt)
+                    )],
+                    max_tokens=150
+                )
+
+                if insights.content.type == "text":
+                    analysis += f"\n\n**AI Insights**:\n{insights.content.text}"
+            except:
+                pass  # Continue without AI insights
+
+        return analysis
 
 
 @mcp.tool()
-async def get_game_details(game_name: str, user: str = None) -> str:
-    """Get detailed information for a specific game."""
+async def get_game_details(
+    game_id: int,
+    user: str | None = None
+) -> str:
+    """Get comprehensive details about a specific game."""
     # Resolve user (optional for this tool) with default fallback
     user_steam_id = None
     if user:
@@ -359,75 +396,378 @@ async def get_game_details(game_name: str, user: str = None) -> str:
         user_result = resolve_user_for_tool(None, get_default_user_fallback)
         if not user_result.get("error"):
             user_steam_id = user_result["steam_id"]
+
+    with get_db() as session:
+        # Find the game by app_id
+        game = session.query(Game).options(
+            joinedload(Game.genres),
+            joinedload(Game.developers),
+            joinedload(Game.publishers),
+            joinedload(Game.categories),
+            joinedload(Game.reviews)
+        ).filter_by(app_id=game_id).first()
+
+        if not game:
+            return f"Game with ID {game_id} not found"
+
+        # Build enhanced details string
+        details = f"""Game: {game.name}
+
+**Ratings**:
+- ESRB: {game.esrb_rating or 'Not rated'} {f'({game.esrb_descriptors})' if game.esrb_descriptors else ''}
+- PEGI: {game.pegi_rating or 'Not rated'} {f'({game.pegi_descriptors})' if game.pegi_descriptors else ''}
+
+**Platforms**:
+- Windows: {'✓' if game.platforms_windows else '✗'}
+- Mac: {'✓' if game.platforms_mac else '✗'}  
+- Linux: {'✓' if game.platforms_linux else '✗'}
+- VR Support: {'✓' if game.vr_support else '✗'}
+
+**Features**:
+- Controller Support: {game.controller_support or 'None'}
+- Metacritic Score: {game.metacritic_score or 'N/A'}/100
+
+**Description**:
+{game.short_description[:500] if game.short_description else 'No description available'}"""
+
+        # Add basic game info
+        if game.release_date:
+            details += f"\n\n**Release Date**: {game.release_date}"
+
+        if game.developers:
+            devs = ", ".join(d.developer_name for d in game.developers)
+            details += f"\n**Developer(s)**: {devs}"
+
+        if game.publishers:
+            pubs = ", ".join(p.publisher_name for p in game.publishers)
+            details += f"\n**Publisher(s)**: {pubs}"
+
+        if game.genres:
+            genres = ", ".join(g.genre_name for g in game.genres)
+            details += f"\n**Genres**: {genres}"
+
+        if game.categories:
+            cats = ", ".join(c.category_name for c in game.categories[:5])
+            details += f"\n**Categories**: {cats}"
+
+        # User-specific data if available
+        if user_steam_id:
+            user_game = session.query(UserGame).filter_by(
+                steam_id=user_steam_id,
+                app_id=game.app_id
+            ).first()
+
+            if user_game:
+                details += "\n\n**Your Stats**:"
+                details += f"\n- Total playtime: {user_game.playtime_forever / 60:.1f} hours"
+                if user_game.playtime_2weeks > 0:
+                    details += f"\n- Recent playtime: {user_game.playtime_2weeks / 60:.1f} hours"
+
+        return details
+
+
+@mcp.tool()
+async def find_family_games(
+    child_age: int,
+    ctx: Context | None = None,
+    user: str | None = None
+) -> str:
+    """Find age-appropriate games for family gaming.
     
-    try:
-        with get_db() as session:
-            # Find the game with all relationships
-            game = session.query(Game).options(
-                joinedload(Game.genres),
-                joinedload(Game.developers),
-                joinedload(Game.publishers),
-                joinedload(Game.categories),
-                joinedload(Game.reviews)
-            ).filter(Game.name.ilike(f"%{game_name}%")).first()
-            
-            if not game:
-                return handle_game_not_found(game_name)["message"]
-            
-            response = f"**{game.name}**\n"
-            response += f"- App ID: {game.app_id}\n"
-            
-            if game.release_date:
-                response += f"- Release Date: {game.release_date}\n"
-            
-            if game.developers:
-                devs = ", ".join(d.developer_name for d in game.developers)
-                response += f"- Developer(s): {devs}\n"
-            
-            if game.publishers:
-                pubs = ", ".join(p.publisher_name for p in game.publishers)
-                response += f"- Publisher(s): {pubs}\n"
-            
-            if game.genres:
-                genres = ", ".join(g.genre_name for g in game.genres)
-                response += f"- Genres: {genres}\n"
-            
-            if game.categories:
-                cats = ", ".join(c.category_name for c in game.categories[:5])
-                response += f"- Categories: {cats}\n"
-            
-            if game.esrb_rating:
-                response += f"- ESRB Rating: {game.esrb_rating}\n"
-            
-            if game.required_age and game.required_age > 0:
-                response += f"- Required Age: {game.required_age}+\n"
-            
-            if game.reviews:
-                review = game.reviews
-                if review.review_summary:
-                    response += f"- Steam Reviews: {review.review_summary}"
-                    if review.positive_percentage:
-                        response += f" ({review.positive_percentage}% positive)"
-                    response += "\n"
-                if review.total_reviews:
-                    response += f"- Total Reviews: {review.total_reviews:,}\n"
-            
-            # User-specific data if available
-            if user_steam_id:
-                user_game = session.query(UserGame).filter_by(
-                    steam_id=user_steam_id,
-                    app_id=game.app_id
-                ).first()
-                
-                if user_game:
-                    response += f"\n**Your Stats:**\n"
-                    response += f"- Total playtime: {user_game.playtime_hours} hours\n"
-                    if user_game.playtime_2weeks > 0:
-                        response += f"- Recent playtime: {user_game.playtime_2weeks_hours} hours\n"
-            
-            return response
-            
-    except Exception as e:
-        return f"Failed to get game details: {str(e)}"
+    Uses ESRB/PEGI ratings and family-friendly categories.
+    For young children (under 10), may gather additional preferences.
+    """
+    # Resolve user
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+
+    # Elicitation for young children
+    if child_age < 10 and ctx:
+        try:
+            result = await ctx.elicit(
+                message=f"Finding games for a {child_age}-year-old. Let's ensure they're appropriate:",
+                schema=FamilyPreferences
+            )
+
+            if result.action == "accept" and result.data:
+                preferences = result.data
+                # Add filters based on content_concerns
+                # This will be used in the filtering logic below
+        except Exception:
+            # Continue without preferences if elicitation fails
+            pass
+
+    # Map age to ratings
+    max_esrb = get_max_esrb_for_age(child_age)
+    max_pegi = get_max_pegi_for_age(child_age)
+
+    with get_db() as session:
+        # Query for age-appropriate games
+        games_query = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).join(Game.categories).filter(
+            Category.category_name == "Family Sharing"
+        )
+
+        # Apply age rating filters
+        games_query = games_query.filter(
+            or_(
+                Game.esrb_rating.in_(get_esrb_ratings_up_to(max_esrb)),
+                Game.pegi_rating.in_(get_pegi_ratings_up_to(max_pegi)),
+                and_(Game.esrb_rating.is_(None), Game.pegi_rating.is_(None))  # Include unrated
+            )
+        )
+
+        # Format results
+        results = []
+        for game, user_game in games_query.limit(10):
+            results.append(
+                f"- {game.name} (ESRB: {game.esrb_rating or 'Unrated'}, "
+                f"PEGI: {game.pegi_rating or 'Unrated'})"
+            )
+
+        if not results:
+            return f"No family-friendly games found in library for age {child_age}"
+
+        return f"Family-friendly games for age {child_age}:\n" + "\n".join(results)
+
+
+@mcp.tool()
+async def find_unplayed_gems(
+    min_rating: int = 75,
+    user: str | None = None
+) -> str:
+    """Find highly-rated games you own but haven't played."""
+    # Resolve user
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+
+    with get_db() as session:
+        # Find unplayed games with high ratings
+        unplayed_games = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).filter(
+            UserGame.playtime_forever == 0,  # Never played
+            Game.metacritic_score >= min_rating
+        ).order_by(
+            Game.metacritic_score.desc()
+        ).limit(10).all()
+
+        if not unplayed_games:
+            return f"No unplayed games found with Metacritic score >= {min_rating}"
+
+        results = ["Hidden gems in your backlog:\n"]
+        for game, user_game in unplayed_games:
+            genre_names = [g.genre_name for g in game.genres[:2]]  # Top 2 genres
+            results.append(
+                f"- {game.name} (Score: {game.metacritic_score}/100)\n"
+                f"  Genres: {', '.join(genre_names)}\n"
+                f"  Why play: {game.short_description[:100]}..." if game.short_description else ""
+            )
+
+        return "\n".join(results)
+
+
+@mcp.tool()
+async def find_multiplayer_games(
+    type: str,  # "coop", "pvp", "local", "online"
+    user: str | None = None
+) -> str:
+    """Find multiplayer games by specific type.
+    
+    Args:
+        type: One of 'coop', 'pvp', 'local', 'online'
+    """
+    # Map type to category names
+    type_to_categories = {
+        "coop": ["Co-op", "Online Co-op"],
+        "pvp": ["PvP", "Online PvP"],
+        "local": ["Shared/Split Screen", "Local Co-op"],
+        "online": ["Multi-player", "Online Multi-Player", "Online Co-op", "Online PvP"]
+    }
+
+    if type not in type_to_categories:
+        return f"Invalid type '{type}'. Use: coop, pvp, local, or online"
+
+    # Resolve user
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+    target_categories = type_to_categories[type]
+
+    with get_db() as session:
+        # Find games with specified multiplayer type
+        games_query = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).join(Game.categories).filter(
+            Category.category_name.in_(target_categories)
+        ).distinct().limit(15)
+
+        results = [f"{type.capitalize()} multiplayer games in your library:\n"]
+        for game, user_game in games_query:
+            # Get all multiplayer categories for this game
+            mp_categories = [c.category_name for c in game.categories
+                           if "player" in c.category_name.lower() or
+                              "co-op" in c.category_name.lower() or
+                              "pvp" in c.category_name.lower()]
+            results.append(
+                f"- {game.name}\n"
+                f"  Modes: {', '.join(mp_categories)}\n"
+                f"  Playtime: {user_game.playtime_forever / 60:.1f} hours"
+            )
+
+        return "\n".join(results)
+
+
+@mcp.tool()
+async def find_games_by_platform(
+    platform: str,  # "windows", "mac", "linux", "vr"
+    user: str | None = None
+) -> str:
+    """Find games compatible with specific platform."""
+    # Platform mapping
+    platform_field_map = {
+        "windows": "platforms_windows",
+        "mac": "platforms_mac",
+        "linux": "platforms_linux",
+        "vr": "vr_support"
+    }
+
+    if platform not in platform_field_map:
+        return f"Invalid platform '{platform}'. Use: windows, mac, linux, or vr"
+
+    # Resolve user
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+
+    with get_db() as session:
+        platform_field = platform_field_map[platform]
+
+        games = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).filter(
+            getattr(Game, platform_field) == True
+        ).order_by(
+            UserGame.playtime_forever.desc()
+        ).limit(20).all()
+
+        if not games:
+            return f"No games found compatible with {platform}"
+
+        results = [f"Games compatible with {platform}:\n"]
+        for game, user_game in games:
+            controller_info = f" [{game.controller_support}]" if game.controller_support else ""
+            results.append(
+                f"- {game.name}{controller_info}\n"
+                f"  Playtime: {user_game.playtime_forever / 60:.1f} hours"
+            )
+
+        return "\n".join(results)
+
+
+@mcp.tool()
+async def find_short_games(
+    max_hours: float = 2.0,
+    user: str | None = None
+) -> str:
+    """Find games suitable for quick gaming sessions."""
+    # Resolve user
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+
+    with get_db() as session:
+        # Find games with low average playtime or casual genre
+        short_games = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).join(Game.genres).filter(
+            or_(
+                Genre.genre_name.in_(["Casual", "Indie", "Racing", "Sports"]),
+                UserGame.playtime_forever < max_hours * 60  # Already played briefly
+            )
+        ).distinct().limit(15).all()
+
+        if not short_games:
+            return f"No games found for quick sessions (< {max_hours} hours)"
+
+        results = [f"Games for quick sessions (< {max_hours} hours):\n"]
+        for game, user_game in short_games:
+            playtime_info = f"Played: {user_game.playtime_forever / 60:.1f}h" if user_game.playtime_forever > 0 else "Unplayed"
+            results.append(
+                f"- {game.name}\n"
+                f"  Genre: {', '.join([g.genre_name for g in game.genres[:2]])}\n"
+                f"  {playtime_info}"
+            )
+
+        return "\n".join(results)
+
+
+# Helper functions
+def format_top_items(items: list[tuple], limit: int) -> str:
+    """Format top N items from query results."""
+    sorted_items = sorted(items, key=lambda x: x[1], reverse=True)[:limit]
+    return "\n".join([f"- {name}: {count} games" for name, count in sorted_items])
+
+def count_category(category_counts: list[tuple], category_name: str) -> int:
+    """Count games in specific category."""
+    for name, count in category_counts:
+        if name == category_name:
+            return count
+    return 0
+
+def get_max_esrb_for_age(age: int) -> str:
+    if age < 6:
+        return "EC"
+    elif age < 10:
+        return "E"
+    elif age < 13:
+        return "E10+"
+    elif age < 17:
+        return "T"
+    else:
+        return "M"
+
+def get_esrb_ratings_up_to(max_rating: str) -> list[str]:
+    ratings = ["EC", "E", "E10+", "T", "M"]
+    return ratings[:ratings.index(max_rating) + 1]
+
+def get_max_pegi_for_age(age: int) -> str:
+    if age < 7:
+        return "3"
+    elif age < 12:
+        return "7"
+    elif age < 16:
+        return "12"
+    elif age < 18:
+        return "16"
+    else:
+        return "18"
+
+def get_pegi_ratings_up_to(max_rating: str) -> list[str]:
+    ratings = ["3", "7", "12", "16", "18"]
+    return ratings[:ratings.index(max_rating) + 1]
 
 

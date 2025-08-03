@@ -1,6 +1,7 @@
 """Basic MCP prompts for Steam Librarian"""
 
 from mcp.server.fastmcp.prompts import base
+
 from .server import mcp
 
 
