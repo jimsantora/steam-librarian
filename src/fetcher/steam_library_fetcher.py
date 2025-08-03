@@ -731,10 +731,11 @@ class SteamLibraryFetcher:
                         logger.info(f"  Found {len(friend_games)} games for {profile.get('personaname')}")
 
                         # Process games using existing logic with caching
-                        for game in friend_games:
+                        total_games = len(friend_games)
+                        for index, game in enumerate(friend_games, 1):
                             try:
-                                # Reuse existing process_game method with caching
-                                game_data = self.process_game(game, 1, 1)  # Don't show progress for friends
+                                # Reuse existing process_game method with proper progress tracking
+                                game_data = self.process_game(game, index, total_games)
                                 # Reuse existing save_to_database method
                                 self.save_to_database(game_data, friend_steam_id)
                             except Exception as e:
