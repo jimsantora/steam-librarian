@@ -318,7 +318,7 @@ async def analyze_library(
             Genre.genre_name,
             func.count(Genre.genre_name)
         ).join(
-            game_genres, Genre.id == game_genres.c.genre_id
+            game_genres, Genre.genre_id == game_genres.c.genre_id
         ).filter(
             game_genres.c.game_id.in_(game_ids)
         ).group_by(Genre.genre_name).all()
@@ -328,7 +328,7 @@ async def analyze_library(
             Category.category_name,
             func.count(Category.category_name)
         ).join(
-            game_categories, Category.id == game_categories.c.category_id
+            game_categories, Category.category_id == game_categories.c.category_id
         ).filter(
             game_categories.c.game_id.in_(game_ids)
         ).group_by(Category.category_name).all()

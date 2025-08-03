@@ -614,6 +614,11 @@ def get_games_by_platform(platform: str) -> str:
             return json.dumps({"error": f"Invalid platform '{platform}'. Use: windows, mac, linux, or vr"})
 
         with get_db() as session:
+            # Get user profile for display name
+            user_profile = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
+            if not user_profile:
+                return json.dumps({"error": f"User profile not found for steam_id: {user_steam_id}"})
+
             platform_field = platform_field_map[platform]
 
             games_query = session.query(Game, UserGame).join(
@@ -639,7 +644,7 @@ def get_games_by_platform(platform: str) -> str:
 
             platform_data = {
                 "platform": platform,
-                "user": user_result["display_name"], 
+                "user": user_profile.persona_name, 
                 "total_games": len(games_data),
                 "games": games_data
             }
@@ -675,6 +680,11 @@ def get_multiplayer_games(type: str) -> str:
         target_categories = type_to_categories[type]
 
         with get_db() as session:
+            # Get user profile for display name
+            user_profile = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
+            if not user_profile:
+                return json.dumps({"error": f"User profile not found for steam_id: {user_steam_id}"})
+
             # Find games with specified multiplayer type
             games_query = session.query(Game, UserGame).join(
                 UserGame,
@@ -703,7 +713,7 @@ def get_multiplayer_games(type: str) -> str:
 
             multiplayer_data = {
                 "multiplayer_type": type,
-                "user": user_result["display_name"],
+                "user": user_profile.persona_name,
                 "total_games": len(games_data),
                 "games": games_data
             }
@@ -727,6 +737,11 @@ def get_unplayed_gems() -> str:
         min_rating = 75  # Default rating threshold
 
         with get_db() as session:
+            # Get user profile for display name
+            user_profile = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
+            if not user_profile:
+                return json.dumps({"error": f"User profile not found for steam_id: {user_steam_id}"})
+
             # Find unplayed games with high ratings
             unplayed_games = session.query(Game, UserGame).join(
                 UserGame,
@@ -754,7 +769,7 @@ def get_unplayed_gems() -> str:
                 games_data.append(game_info)
 
             unplayed_data = {
-                "user": user_result["display_name"],
+                "user": user_profile.persona_name,
                 "min_rating": min_rating,
                 "total_games": len(games_data),
                 "games": games_data
