@@ -1,924 +1,295 @@
 # Steam Librarian MCP Server
 
-A powerful Model Context Protocol (MCP) server built with FastMCP that provides intelligent access to Steam game library data through natural language processing and advanced gaming analytics.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Tools](#tools)
-- [API Endpoints](#api-endpoints)
-- [Running the Server](#running-the-server)
-- [Testing](#testing)
-- [Monitoring](#monitoring)
-- [Development](#development)
-- [Troubleshooting](#troubleshooting)
-
 ## Overview
 
-The Steam Librarian MCP Server is a complete rewrite of the original server, migrating from stdio-based communication to HTTP streaming using FastMCP. This server provides sophisticated tools for searching, filtering, analyzing, and getting recommendations from Steam game libraries.
-
-### Key Improvements
-
-- **HTTP Streaming**: Uses FastMCP for HTTP-based communication instead of stdio
-- **Enhanced Configuration**: Comprehensive settings management with validation
-- **Health Monitoring**: Built-in health checks and metrics endpoints
-- **Smart Caching**: Intelligent caching with TTL and invalidation
-- **Natural Language Processing**: Advanced search with mood detection and context understanding
-- **Multi-user Support**: Seamless handling of multiple Steam users
-- **Production Ready**: Graceful shutdown, signal handling, and monitoring tools
-
-## Architecture
-
-```
-src/mcp_server/
-├── server.py              # Main FastMCP server with health endpoints
-├── config.py              # Configuration management and validation
-├── cache.py               # Smart caching system
-├── errors.py              # Error handling framework
-├── user_context.py        # Multi-user context resolution
-├── validation.py          # Input validation schemas
-├── run_server.py          # Production server startup script
-├── monitor.py             # Monitoring and administration tool
-├── tools/                 # MCP tools implementation
-│   ├── __init__.py
-│   ├── search_games.py    # Natural language game search
-│   ├── filter_games.py    # Advanced filtering with presets
-│   ├── get_recommendations.py  # Intelligent recommendations
-│   ├── get_friends_data.py     # Social gaming features
-│   └── get_library_stats.py    # Comprehensive analytics
-├── utils/                 # Utility functions
-│   ├── library_stats.py
-│   ├── game_details.py
-│   └── activity.py
-├── resources/             # MCP resources (pending FastMCP support)
-└── prompts/               # MCP prompts (pending FastMCP support)
-```
+The Steam Librarian MCP (Model Context Protocol) Server provides AI-powered access to Steam game library data through a comprehensive set of tools, resources, and prompts. Built with FastMCP, it offers natural language search, personalized recommendations, and detailed game insights through a simplified, consolidated architecture.
 
 ## Features
 
-### Advanced Gaming Tools
+### 🛠️ MCP Tools
+Intelligent tools for game discovery and library analysis:
 
-1. **Natural Language Search** - Search games using natural language queries
-2. **Smart Filtering** - Filter games with intelligent presets and custom criteria
-3. **Personalized Recommendations** - Get game recommendations based on your preferences
-4. **Social Gaming** - Analyze friends' libraries and find common games
-5. **Library Analytics** - Comprehensive statistics and insights about your gaming habits
+- **`search_games`** - Natural language game search with smart mappings
+- **`analyze_library`** - Comprehensive library statistics and insights  
+- **`get_game_details`** - Detailed game information with user stats
+- **`find_family_games`** - Age-appropriate games with ESRB/PEGI filtering
+- **`find_unplayed_gems`** - Highly-rated games in backlog
+- **`find_multiplayer_games`** - Games by multiplayer type (coop, pvp, local, online)
+- **`find_games_by_platform`** - Platform-specific games (Windows, Mac, Linux, VR)
+- **`find_short_games`** - Games suitable for quick sessions
+- **`generate_recommendation`** - LLM-powered game recommendations
+- **`find_games_with_preferences`** - Interactive preference-based discovery
 
-### Technical Features
+### 📊 MCP Resources
+Structured data access for library exploration:
 
-- **FastMCP Framework** - HTTP streaming protocol for better performance
-- **Multi-user Context** - Automatic user resolution with intelligent fallbacks
-- **Smart Caching** - Memory-based caching with configurable TTL
-- **Health Monitoring** - Real-time health checks and component status
-- **Metrics Collection** - System and application performance metrics
-- **Configuration Management** - Environment-based configuration with validation
-- **Error Handling** - Comprehensive error handling with user-friendly messages
+- **`library://overview`** - Library statistics and server status
+- **`library://users`** - Available users in database
+- **`library://users/{user_id}`** - User profile information
+- **`library://users/{user_id}/games`** - User's game library
+- **`library://users/{user_id}/stats`** - User gaming statistics
+- **`library://games/{game_id}`** - Detailed game information
+- **`library://genres`** - Available game genres with counts
+- **`library://genres/{genre_name}`** - Games by genre
+- **`library://tags`** - Available user-generated tags with counts
+- **`library://tags/{tag_name}`** - Games by community tag
 
-## Installation
+### 💬 MCP Prompts
+Pre-built conversation starters:
 
-### Prerequisites
+- **Gaming Session Planner** - Get personalized game recommendations
+- **Library Analysis** - Analyze gaming habits and preferences
+- **Game Discovery** - Find new games based on mood and time
+- **Multiplayer Game Finder** - Find games to play with friends
+- **Game Completion Helper** - Get help completing specific games
 
-- Python 3.8+
-- Steam Library database (created by `steam_library_fetcher.py`)
-- Required Python packages (see requirements.txt)
+## Architecture
 
-### Setup
-
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
+### Simplified Structure
+```
+src/mcp_server/
+├── server.py          # FastMCP server with HTTP transport
+├── run_server.py      # Production startup script
+├── config.py          # Environment-based configuration
+├── tools.py           # All MCP tools (consolidated)
+├── resources.py       # All MCP resources (consolidated)
+├── prompts.py         # All MCP prompts (consolidated)
+└── completions.py     # Intelligent argument completions
 ```
 
-2. Configure environment variables (optional):
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
+### Key Design Principles
+- **Consolidated Architecture**: All tools, resources, and prompts in single files
+- **Personal Library Focus**: Default user handling for single-user scenarios
+- **Rich Game Intelligence**: Uses genres, categories, and user-generated tags
+- **Database-First**: Direct SQLAlchemy ORM queries for performance
+- **Error Resilience**: Graceful handling of missing users or data
 
-3. Ensure database exists:
-```bash
-python src/fetcher/steam_library_fetcher.py
+## Database Intelligence
+
+### Advanced Game Classification
+The server leverages multiple data sources for intelligent game discovery:
+
+#### Official Steam Data
+- **Genres** (15 types): Action, Adventure, RPG, Strategy, Casual, Indie, etc.
+- **Categories** (53 features): Single-player, Multi-player, Co-op, Family Sharing, etc.
+- **ESRB/PEGI Ratings**: Age-appropriate content filtering
+
+#### Community Data
+- **User Tags**: Community-driven tags like "Roguelike", "Hero Shooter", "Class-Based"
+- **Superior Classification**: Tags provide gameplay style insights beyond official categories
+- **Popular Tags**: "Atmospheric", "Story Rich", "Great Soundtrack", "Puzzle", "Card Game"
+
+### Smart Query Processing
+```python
+# Example: Family game detection
+Genre: "Casual" + Category: "Family Sharing" = Family-friendly games
+
+# Example: Short session games  
+Tags: "Arcade", "Puzzle", "Card Game" = Quick gaming sessions
+
+# Example: Multiplayer intelligence
+Category: "Co-op" vs "PvP" = Cooperative vs competitive experiences
 ```
 
 ## Configuration
 
-The server uses a comprehensive configuration system with environment variable support.
-
 ### Environment Variables
+- `MCP_HOST`: Server host (default: "127.0.0.1")
+- `MCP_PORT`: Server port (default: "8000") 
+- `DEFAULT_USER`: Default Steam user for personal library mode
+- `DATABASE_URL`: Database connection string (default: "sqlite:///steam_library.db")
+- `DEBUG`: Enable debug mode (default: false)
 
-```bash
-# Server Settings
-HOST=0.0.0.0
-PORT=8000
-DEBUG=false
-WORKERS=1
-
-# Database
-DATABASE_URL=sqlite:///steam_library.db
-DATABASE_ECHO=false
-DATABASE_POOL_SIZE=5
-
-# Caching
-CACHE_TTL=3600
-CACHE_TTL_SEARCH=900
-CACHE_TTL_RECOMMENDATIONS=3600
-ENABLE_CACHE=true
-CACHE_MAX_SIZE=1000
-
-# Performance
-MAX_SEARCH_RESULTS=50
-MAX_RECOMMENDATIONS=10
-REQUEST_TIMEOUT=30
-
-# Features
-ENABLE_NL_SEARCH=true
-ENABLE_RECOMMENDATIONS=true
-ENABLE_FRIENDS_DATA=true
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FILE=/var/log/steam_librarian.log
-```
-
-### Configuration Validation
-
-The server validates configuration on startup and provides warnings/errors:
-
+### Default User Handling
+All tools support automatic user resolution:
 ```python
-from mcp_server.config import config_manager
-
-# Validate configuration
-validation = config_manager.validate_configuration()
-if not validation["valid"]:
-    print("Configuration errors:", validation["errors"])
+# Try provided user parameter
+# Fall back to single user in database  
+# Use DEFAULT_USER environment variable
+# Return helpful error if multiple users exist
 ```
 
-## Tools
+## Usage
 
-### 1. search_games
-
-Natural language game search with intelligent parsing.
-
-**Features:**
-- Mood detection (chill, intense, creative, social, nostalgic)
-- Genre recognition
-- Similarity matching ("games like Portal")
-- Time constraint understanding
-- Playtime filtering
-
-**Examples:**
-```
-"chill puzzle games"
-"games like portal"
-"unplayed rpg games"
-"something relaxing for tonight"
-"intense action games I haven't touched"
-```
-
-### 2. filter_games
-
-Filter games with intelligent presets and custom criteria.
-
-**Presets:**
-- `comfort_food` - Highly rated games with good playtime (5+ hours)
-- `hidden_gems` - Positive games with minimal playtime (<2 hours)
-- `quick_session` - Games for short play sessions (<1 hour)
-- `deep_dive` - Games with extensive content (20+ hours)
-
-**Custom Filters:**
-- Playtime range (min/max hours)
-- Review ratings
-- Categories (Single-player, Co-op, etc.)
-- Maturity ratings
-- Sorting options
-
-### 3. get_recommendations
-
-Personalized game recommendations based on your library and preferences.
-
-**Context Options:**
-- `mood` - Current gaming mood
-- `time_available` - Available time (quick/medium/long)
-- `exclude_recent` - Exclude recently played games
-- `with_friends` - Prioritize multiplayer games
-
-**Algorithm Features:**
-- Genre preference analysis
-- Developer affinity scoring
-- Playtime pattern recognition
-- Review quality weighting
-- Context-aware filtering
-
-### 4. get_friends_data
-
-Social gaming features for multiplayer experiences.
-
-**Data Types:**
-- `common_games` - Games owned by both you and friends
-- `friend_activity` - Recent gaming activity of friends
-- `multiplayer_compatible` - Friends who own specific multiplayer games
-- `compatibility_score` - Gaming compatibility analysis
-
-**Features:**
-- Common game discovery
-- Activity tracking
-- Compatibility scoring
-- Game recommendations from friends
-
-### 5. get_library_stats
-
-Comprehensive library statistics and insights.
-
-**Time Periods:**
-- `all_time` - Complete library history
-- `last_year` - Past 12 months
-- `last_6_months` - Past 6 months
-- `last_month` - Past 30 days
-- `last_week` - Past 7 days
-
-**Analytics:**
-- Basic statistics (total games, playtime, averages)
-- Genre distribution and preferences
-- Developer/publisher analysis
-- Playtime patterns and trends
-- AI-generated gaming insights
-- Completion estimates
-
-## API Endpoints
-
-### Health Check Endpoints
-
-#### GET /health
-Basic health check for liveness probes.
-
-**Response:**
-```
-OK (200) - Server is healthy
-UNHEALTHY: <reason> (503) - Server is unhealthy
-```
-
-#### GET /health/detailed
-Detailed health check with component status.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-20T10:30:00Z",
-  "server": {
-    "name": "steam-librarian",
-    "version": "2.0.0",
-    "python_version": "3.9.0",
-    "pid": 12345
-  },
-  "components": {
-    "database": {
-      "status": "healthy",
-      "user_count": 5
-    },
-    "cache": {
-      "status": "healthy"
-    },
-    "tools": {
-      "status": "healthy",
-      "count": 5,
-      "available": ["search_games", "filter_games", ...]
-    }
-  }
-}
-```
-
-### Configuration Endpoint
-
-#### GET /config
-Get current server configuration.
-
-**Response:**
-```json
-{
-  "server_info": {
-    "name": "steam-librarian",
-    "version": "2.0.0",
-    "debug": false,
-    "host": "0.0.0.0",
-    "port": 8000
-  },
-  "performance": {
-    "max_search_results": 50,
-    "max_recommendations": 10,
-    "cache_settings": {...}
-  },
-  "features": {
-    "natural_language_search": true,
-    "recommendations": true,
-    "friends_data": true
-  },
-  "validation": {
-    "valid": true,
-    "warnings": [],
-    "errors": []
-  }
-}
-```
-
-### Metrics Endpoint
-
-#### GET /metrics
-Get server metrics and performance data.
-
-**Response:**
-```json
-{
-  "timestamp": "2024-01-20T10:30:00Z",
-  "system": {
-    "cpu_percent": 15.2,
-    "memory_mb": 256.5,
-    "memory_percent": 3.2,
-    "threads": 4,
-    "uptime_seconds": 3600
-  },
-  "cache": {
-    "size": 150,
-    "max_size": 1000,
-    "hit_rate": 0.85
-  },
-  "database": {
-    "users": 5,
-    "games": 1200
-  }
-}
-```
-
-### MCP Protocol Endpoint
-
-#### /mcp
-The main MCP protocol endpoint for tool invocation via HTTP streaming.
-
-## Running the Server
-
-### Production Startup
-
-Use the provided startup script for production deployment:
-
+### Starting the Server
 ```bash
+# Production mode
 python src/mcp_server/run_server.py
+
+# Development mode with debug logging
+DEBUG=true python src/mcp_server/run_server.py
+
+# Module mode
+python -m mcp_server.run_server
 ```
 
-This script provides:
-- Configuration validation
-- Database connectivity check
-- Signal handling for graceful shutdown
-- Startup information logging
-- Feature flag reporting
+### Health Endpoints
+- **`/health`** - Basic health check
+- **`/health/detailed`** - Detailed server status
+- **`/mcp`** - MCP protocol endpoint
 
-### Development Mode
-
-For development with debug logging:
-
+### Docker Usage
 ```bash
-DEBUG=true LOG_LEVEL=DEBUG python src/mcp_server/run_server.py
+# Via Docker Compose
+docker-compose up mcp-server
+
+# With environment overrides
+DEFAULT_USER=76561198020403796 docker-compose up mcp-server
 ```
 
-### Direct Server Run
+## Tool Examples
 
-For testing or custom integration:
-
+### Natural Language Search
 ```python
-import asyncio
-from mcp_server.server import mcp
+# Smart query interpretation
+search_games("family games") 
+# → Filters by Genre: "Casual" + Category: "Family Sharing"
 
-async def main():
-    await mcp.run_streamable_http_async(
-        host="0.0.0.0",
-        port=8000
-    )
+search_games("something relaxing after work")
+# → Uses AI to interpret and suggest calming games
 
-asyncio.run(main())
+search_games("coop games")
+# → Filters by Category: "Co-op" or "Multi-player"
 ```
+
+### Intelligent Recommendations
+```python
+# Age-appropriate filtering
+find_family_games(child_age=8)
+# → ESRB ≤ E, PEGI ≤ 7, Family Sharing category
+
+# Platform-specific discovery
+find_games_by_platform("vr")
+# → Games with VR support detected from categories
+
+# Backlog management
+find_unplayed_gems(min_rating=80)
+# → Unplayed games with Metacritic ≥ 80
+```
+
+### Resource Access
+```bash
+# Get all available tags
+curl "http://localhost:8000/mcp" -X POST \
+  -d '{"method": "resources/read", "params": {"uri": "library://tags"}}'
+
+# Find roguelike games  
+curl "http://localhost:8000/mcp" -X POST \
+  -d '{"method": "resources/read", "params": {"uri": "library://tags/roguelike"}}'
+```
+
+## Advanced Features
+
+### AI Integration
+- **LLM Sampling**: Generate contextual game recommendations
+- **Natural Language Processing**: Interpret complex gaming requests
+- **Interactive Elicitation**: Collect user preferences for personalized results
+
+### Intelligent Completions
+- **Game Name Completions**: Autocomplete with popular Steam games
+- **Genre Suggestions**: Valid genre names for filtering
+- **User Completions**: Available users with persona names
+
+### Error Handling
+- **Graceful Degradation**: Continue operation when data is missing
+- **User Resolution**: Helpful error messages for user identification
+- **Fallback Behavior**: Default to available data when queries fail
 
 ## Testing
 
-The Steam Librarian MCP Server includes a comprehensive test suite with both unit and integration tests to ensure reliability and functionality.
-
-### Test Structure
-
-```
-tests/
-├── __init__.py
-├── test_mcp_server.py      # Comprehensive unit tests
-└── test_integration.py     # Integration tests with server startup
-```
-
 ### Running Tests
-
-The project provides convenient Make targets for different testing scenarios:
-
-#### Quick Tests
 ```bash
 # Run basic import tests (fastest)
 make test
-```
 
-#### Unit Tests
-```bash
 # Run comprehensive unit tests
 make test-unit
-```
 
-#### Integration Tests
-```bash
 # Run integration tests (starts test server)
 make test-integration
-```
 
-#### Full Test Suite
-```bash
 # Run all tests (unit + integration)
 make test-full
-```
 
-#### Development Testing
-```bash
 # Run all code quality checks + comprehensive tests
 make check-full
 ```
 
 ### Test Coverage
+- **Unit Tests**: All critical modules, tools, and database models
+- **Integration Tests**: Server startup, health endpoints, MCP protocol
+- **Quality Assurance**: Linting (ruff), formatting (black), code validation
 
-#### Unit Tests (52 test cases)
-- **Import Testing**: All critical modules and tools
-- **Configuration Management**: Server info, feature flags, validation
-- **FastMCP Integration**: Server instance, tool registration, metadata
-- **Database Models**: Connection, model attributes, relationships
-- **Caching System**: Set/get operations, cache invalidation, get_or_compute
-- **User Context Resolution**: Graceful handling of missing data
-- **Input Validation**: All Pydantic schemas with proper error handling
-- **Error Framework**: Decorator functionality and error classes
-- **Monitoring Tools**: Script existence and executability
+## Performance Characteristics
 
-#### Integration Tests
-- **Server Startup**: Production server launch and health checks
-- **Health Endpoints**: Basic and detailed health monitoring
-- **MCP Protocol**: Basic connectivity and protocol compliance
-
-#### Tool Testing
-All 5 MCP tools are validated for proper registration and functionality:
-1. **search_games** - Natural language game search
-2. **filter_games** - Advanced filtering with presets
-3. **get_recommendations** - Personalized recommendations
-4. **get_friends_data** - Social gaming features
-5. **get_library_stats** - Comprehensive analytics
-
-### Test Environment Setup
-
-Tests are designed to work in any environment, including:
-- **Empty databases** (graceful handling of missing data)
-- **Missing dependencies** (`aiohttp` optional for integration tests)
-- **CI/CD environments** (no external dependencies required)
-
-### Test Results Format
-
-Unit tests provide detailed output and progress tracking:
-```
-Steam Librarian MCP Server Test Suite
-==================================================
-
-Testing Imports...
-✓ Import mcp_server.server
-✓ Import mcp_server.config
-...
-
-Test Results Summary
-✓ Passed: 52
-✗ Failed: 0
-Success Rate: 100.0%
-
-All tests passed! The MCP Server is ready for production.
-```
-
-Integration tests show server startup and endpoint testing:
-```
-Steam Librarian MCP Server Integration Tests
-==================================================
-Starting test server...
-✓ Test server started successfully
-
-Testing Health Endpoints...
-✓ Basic health check
-✓ Detailed health check
-...
-
-Integration Test Results: 2/2 passed
-All integration tests passed!
-```
-
-### Continuous Integration
-
-For CI/CD pipelines, use the comprehensive check:
-```bash
-# Run linting, formatting, and all tests
-make check-full
-```
-
-This ensures:
-- Code follows style guidelines (ruff linting)
-- Formatting is consistent (black formatting)
-- All unit tests pass
-- Integration tests complete successfully
-- Server is production-ready
-
-### Writing New Tests
-
-When adding new functionality, update the test suites:
-
-#### Adding Unit Tests
-```python
-# In tests/test_mcp_server.py
-def test_my_new_feature(self):
-    """Test description"""
-    # Test implementation
-    self.assert_test(condition, "Test name", "Error message")
-```
-
-#### Adding Integration Tests
-```python
-# In tests/test_integration.py
-async def test_my_endpoint(self):
-    """Test new endpoint"""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"{self.base_url}/my-endpoint") as response:
-            assert response.status == 200
-```
-
-### Test Performance
-
-- **Unit Tests**: ~5-10 seconds (no server startup)
-- **Integration Tests**: ~15-30 seconds (includes server startup)
-- **Full Suite**: ~20-40 seconds total
-
-Tests are optimized for speed with caching and parallel execution where possible.
-
-## Monitoring
-
-### Monitor Tool
-
-The `monitor.py` script provides comprehensive monitoring capabilities:
-
-```bash
-# Check server health
-python src/mcp_server/monitor.py health
-
-# Get detailed health information
-python src/mcp_server/monitor.py health --detailed
-
-# Show server configuration
-python src/mcp_server/monitor.py config
-
-# Display metrics
-python src/mcp_server/monitor.py metrics
-
-# Complete server status
-python src/mcp_server/monitor.py status
-
-# Continuous monitoring
-python src/mcp_server/monitor.py monitor --interval 5
-
-# JSON output for integration
-python src/mcp_server/monitor.py monitor --format json
-```
-
-### Health Check Integration
-
-For Kubernetes or Docker health checks:
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /health/detailed
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 10
-```
-
-## Development
-
-### Adding New Tools
-
-1. Create a new file in `tools/`:
-```python
-from ..server import mcp
-
-@mcp.tool()
-async def my_new_tool(param1: str, param2: Optional[int] = None) -> str:
-    """Tool description"""
-    # Implementation
-    return "Result"
-```
-
-2. Import in `tools/__init__.py`:
-```python
-from . import my_new_tool
-```
-
-### Custom Health Checks
-
-Add custom health check components:
-
-```python
-# In server.py health check
-try:
-    # Your custom check
-    custom_status = check_custom_component()
-    health_data["components"]["custom"] = {
-        "status": "healthy" if custom_status else "unhealthy"
-    }
-except Exception as e:
-    health_data["components"]["custom"] = {
-        "status": "unhealthy",
-        "error": str(e)
-    }
-```
+### Optimized Database Access
+- **Relationship Loading**: Efficient `joinedload()` for related data
+- **Indexed Queries**: Optimized searches on common fields
+- **Session Management**: Proper connection pooling and cleanup
 
 ### Caching Strategy
+- **In-Memory**: SQLAlchemy relationship caching
+- **Database-Level**: Indexed lookups for frequent queries
+- **Application-Level**: Reused database sessions where appropriate
 
-The caching system uses different TTLs for different operations:
+## Version History
 
-```python
-# Search results - 15 minutes
-cache_key = search_cache_key(query, user_id)
-results = await cache.get_or_compute(cache_key, compute_fn, ttl=900)
+### Current (v1.1.3+)
+- **User-Generated Tags**: Community tag extraction and resources
+- **Consolidated Architecture**: Simplified module structure
+- **Enhanced Game Intelligence**: Multi-source classification system
+- **Personal Library Focus**: Default user handling
+- **Rich Metadata**: ESRB/PEGI ratings, platform support, accessibility features
 
-# User data - 30 minutes
-cache_key = user_cache_key("profile", user_id)
-profile = await cache.get_or_compute(cache_key, compute_fn, ttl=1800)
+### Previous Versions
+- **v1.1.2**: Initial MCP implementation with modular architecture
+- **v1.1.1**: Basic tools and resources for game discovery
+- **v1.1.0**: Core Steam library integration
 
-# Recommendations - 1 hour
-cache_key = user_cache_key("recommendations", user_id)
-recs = await cache.get_or_compute(cache_key, compute_fn, ttl=3600)
-```
+## Best Practices
 
-### Development Testing
+### Tool Implementation
+- Always use `resolve_user_for_tool()` for user parameter handling
+- Include helpful error messages with suggested actions
+- Leverage database relationships for efficient queries
+- Provide rich context in tool responses
 
-When developing new features, always run tests to ensure everything works:
+### Resource Design
+- Return structured JSON with consistent error handling
+- Include metadata like counts and totals
+- Support both exact and partial matching for user convenience
+- Maintain consistent URI patterns
 
-```bash
-# Before committing changes
-make check-full
-
-# During development (faster feedback)
-make test-unit
-
-# After adding new endpoints
-make test-integration
-```
-
-#### Test-Driven Development
-
-1. **Write tests first** for new tools:
-```python
-def test_my_new_tool(self):
-    """Test my new tool functionality"""
-    # Test the tool behavior
-    self.assert_test(condition, "Tool works correctly")
-```
-
-2. **Run tests frequently**:
-```bash
-# Quick feedback loop
-make test-unit
-```
-
-3. **Validate integration**:
-```bash
-# After implementation is complete
-make test-full
-```
+### Performance Optimization
+- Use `joinedload()` for related data to avoid N+1 queries
+- Limit results appropriately (typically 10-20 items)
+- Sort results by relevance (playtime, ratings, popularity)
+- Cache expensive computations where possible
 
 ## Troubleshooting
 
 ### Common Issues
-
-#### Database Connection Failed
-```
-ERROR: Database connection failed: no such table: user_profiles
-```
-**Solution:** Run the fetcher to create the database:
-```bash
-python src/fetcher/steam_library_fetcher.py
-```
-
-#### Port Already in Use
-```
-ERROR: [Errno 48] Address already in use
-```
-**Solution:** Change the port or stop the conflicting service:
-```bash
-PORT=8001 python src/mcp_server/run_server.py
-```
-
-#### Import Errors
-```
-ImportError: attempted relative import beyond top-level package
-```
-**Solution:** Run from the project root directory:
-```bash
-cd /path/to/steam-librarian
-python src/mcp_server/run_server.py
-```
+- **Empty tool responses**: Ensure user has games in library
+- **User not found**: Check DEFAULT_USER environment variable
+- **Database errors**: Verify database connection and schema
+- **Missing data**: Run fetcher to populate game metadata
 
 ### Debug Mode
-
-Enable debug mode for detailed logging:
 ```bash
-DEBUG=true LOG_LEVEL=DEBUG python src/mcp_server/run_server.py
+# Enable detailed logging
+DEBUG=true python src/mcp_server/run_server.py
+
+# Check MCP registration
+curl http://localhost:8000/mcp -X POST \
+  -d '{"method": "tools/list"}' | jq
 ```
 
-### Test Failures
-
-#### Unit Test Import Errors
-```
-ImportError: attempted relative import beyond top-level package
-```
-**Solution:** Ensure you're running tests from the project root with proper PYTHONPATH:
-```bash
-# Use make targets (recommended)
-make test-unit
-
-# Or manual execution with correct path
-cd /path/to/steam-librarian
-PYTHONPATH=src python tests/test_mcp_server.py
-```
-
-#### Integration Test Server Startup Fails
-```
-Test server failed to start within timeout
-```
-**Solution:** Check if the port is already in use or increase timeout:
-```bash
-# Check for conflicting services
-lsof -i :8001
-
-# Use different port for testing
-PORT=8002 make test-integration
-```
-
-#### Missing aiohttp Dependency
-```
-aiohttp not available - integration tests will be limited
-```
-**Solution:** Install aiohttp for full integration testing:
-```bash
-pip install aiohttp
-make test-integration
-```
-
-#### Database-Related Test Failures
-```
-no such table: user_profile
-```
-**Solution:** This is expected for tests in empty environments. Tests handle this gracefully, but to test with real data:
-```bash
-# Create test database first
-python src/fetcher/steam_library_fetcher.py
-make test-unit
-```
-
-#### Cache Test Failures
-```
-Cache missing set/get methods
-```
-**Solution:** This indicates a caching system issue. Verify the cache implementation:
-```bash
-# Check cache module directly
-python -c "from src.mcp_server.cache import cache; print(hasattr(cache, 'get'))"
-```
-
-<br>
-
----
-# Performance Tuning
-
-For high-load scenarios, adjust settings:
-```bash
-# Increase cache size
-CACHE_MAX_SIZE=5000
-
-# Increase database pool
-DATABASE_POOL_SIZE=20
-
-# Reduce cache TTLs for fresher data
-CACHE_TTL_SEARCH=300
-CACHE_TTL_USER=600
-
-# Increase concurrent requests
-MAX_CONCURRENT_REQUESTS=500
-```
-
-<br>
-
----
-# Integration Examples
-
-### Claude Desktop Integration
-
-Add to Claude Desktop configuration:
-
-```json
-{
-  "mcpServers": {
-    "steam-librarian": {
-      "command": "python",
-      "args": ["path/to/steam-librarian/src/mcp_server/run_server.py"],
-      "env": {
-        "DEBUG": "false",
-        "PORT": "8000"
-      }
-    }
-  }
-}
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8000/health').raise_for_status()"
-
-CMD ["python", "src/mcp_server/run_server.py"]
-```
-
-### API Client Example
-
+### Integration Testing
 ```python
-import aiohttp
-import asyncio
-
-async def search_games(query: str):
-    async with aiohttp.ClientSession() as session:
-        payload = {
-            "method": "tools/call",
-            "params": {
-                "name": "search_games",
-                "arguments": {
-                    "query": query
-                }
-            }
-        }
-        
-        async with session.post("http://localhost:8000/mcp", json=payload) as response:
-            result = await response.json()
-            return result
-
-# Usage
-results = asyncio.run(search_games("chill puzzle games"))
+# Test basic tool functionality
+python -c "
+from mcp_server.tools import search_games
+result = search_games('action games')
+print(result)
+"
 ```
-
-## Performance Considerations
-
-- **Caching**: All expensive operations are cached with appropriate TTLs
-- **Database**: Uses SQLAlchemy with connection pooling
-- **Async Operations**: All I/O operations are asynchronous
-- **Memory Management**: Cache has configurable size limits
-- **Request Timeouts**: Configurable timeouts prevent hanging requests
-
-<br>
-
----
-# Security Notes
-
-- The server binds to `0.0.0.0` by default - restrict in production
-- Database credentials are hidden in configuration endpoints
-- No authentication is built-in - add reverse proxy authentication if needed
-- Steam API keys are optional and stored securely in environment variables
-
-<br>
-
----
-# Future Enhancements
-
-- WebSocket support for real-time updates
-- Redis cache backend for distributed deployments
-- PostgreSQL support for better scalability
-- Authentication and authorization
-- Rate limiting and request throttling
-- Prometheus metrics export
-- OpenTelemetry tracing

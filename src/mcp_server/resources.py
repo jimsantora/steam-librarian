@@ -1,16 +1,19 @@
 """MCP resources using proper database schema"""
 
 import json
+
 from sqlalchemy.orm import joinedload
 
 from shared.database import (
     Game,
+    Genre,
+    Tag,
     UserGame,
     UserProfile,
-    Genre,
     get_db,
     resolve_user_for_tool,
 )
+
 from .config import config
 from .server import mcp
 
@@ -35,7 +38,7 @@ def get_game(game_id: str) -> str:
                 joinedload(Game.categories),
                 joinedload(Game.reviews)
             ).filter_by(app_id=int(game_id)).first()
-            
+
             if game:
                 game_data = {
                     "id": game.app_id,
@@ -49,7 +52,7 @@ def get_game(game_id: str) -> str:
                     "required_age": game.required_age,
                     "esrb_descriptors": game.esrb_descriptors
                 }
-                
+
                 # Add review data if available
                 if game.reviews:
                     game_data["reviews"] = {
@@ -58,11 +61,11 @@ def get_game(game_id: str) -> str:
                         "total": game.reviews.total_reviews,
                         "positive_percentage": game.reviews.positive_percentage
                     }
-                
+
                 return json.dumps(game_data, indent=2)
             else:
                 return json.dumps({"error": f"Game with ID {game_id} not found"})
-            
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get game: {str(e)}"})
 
@@ -76,11 +79,11 @@ def library_overview() -> str:
             total_games = session.query(Game).count()
             total_users = session.query(UserProfile).count()
             total_genres = session.query(Genre).count()
-            
+
             # Try to get default user info
             default_user_info = None
             user_result = resolve_user_for_tool(None, get_default_user_fallback)
-            
+
             if "error" not in user_result:
                 user_steam_id = user_result["steam_id"]
                 user = session.query(UserProfile).filter_by(steam_id=user_steam_id).first()
@@ -91,7 +94,7 @@ def library_overview() -> str:
                         "steam_id": user.steam_id,
                         "game_count": game_count
                     }
-            
+
             # Get top genres across all games
             genres = session.query(Genre).all()
             genre_counts = []
@@ -99,9 +102,9 @@ def library_overview() -> str:
                 count = len(genre.games)
                 if count > 0:
                     genre_counts.append({"genre": genre.genre_name, "count": count})
-            
+
             genre_counts.sort(key=lambda x: x["count"], reverse=True)
-            
+
             overview = {
                 "message": "Steam Library MCP Server Overview",
                 "statistics": {
@@ -129,9 +132,9 @@ def library_overview() -> str:
                     "get_game_details - Detailed game information with user stats"
                 ]
             }
-            
+
             return json.dumps(overview, indent=2)
-        
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get overview: {str(e)}"})
 
@@ -151,19 +154,19 @@ def get_user_profile(user_id: str) -> str:
                 resolved_user_id = user_result["steam_id"]
             else:
                 resolved_user_id = user_id
-            
+
             # Try to resolve user_id as either steam_id or persona_name
             user = session.query(UserProfile).filter(
-                (UserProfile.steam_id == resolved_user_id) | 
+                (UserProfile.steam_id == resolved_user_id) |
                 (UserProfile.persona_name.ilike(resolved_user_id))
             ).first()
-            
+
             if not user:
                 return json.dumps({"error": f"User '{user_id}' not found"})
-            
+
             # Get game count
             game_count = session.query(UserGame).filter_by(steam_id=user.steam_id).count()
-            
+
             user_data = {
                 "steam_id": user.steam_id,
                 "persona_name": user.persona_name,
@@ -182,9 +185,9 @@ def get_user_profile(user_id: str) -> str:
                 "last_updated": user.last_updated,
                 "is_default": user.steam_id == config.default_user or user.persona_name == config.default_user
             }
-            
+
             return json.dumps(user_data, indent=2)
-            
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get user profile: {str(e)}"})
 
@@ -202,22 +205,22 @@ def get_user_games(user_id: str) -> str:
                 resolved_user_id = user_result["steam_id"]
             else:
                 resolved_user_id = user_id
-            
+
             # Resolve user
             user = session.query(UserProfile).filter(
-                (UserProfile.steam_id == resolved_user_id) | 
+                (UserProfile.steam_id == resolved_user_id) |
                 (UserProfile.persona_name.ilike(resolved_user_id))
             ).first()
-            
+
             if not user:
                 return json.dumps({"error": f"User '{user_id}' not found"})
-            
+
             # Get user's games with details
             user_games = session.query(UserGame).options(
                 joinedload(UserGame.game).joinedload(Game.genres),
                 joinedload(UserGame.game).joinedload(Game.developers)
             ).filter(UserGame.steam_id == user.steam_id).all()
-            
+
             games_data = []
             for ug in user_games:
                 games_data.append({
@@ -231,19 +234,19 @@ def get_user_games(user_id: str) -> str:
                     "developers": [d.developer_name for d in ug.game.developers],
                     "release_date": ug.game.release_date
                 })
-            
+
             # Sort by playtime descending
             games_data.sort(key=lambda x: x["playtime_forever_minutes"], reverse=True)
-            
+
             library_data = {
                 "user": user.persona_name,
                 "steam_id": user.steam_id,
                 "total_games": len(games_data),
                 "games": games_data
             }
-            
+
             return json.dumps(library_data, indent=2)
-            
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get user games: {str(e)}"})
 
@@ -261,27 +264,27 @@ def get_user_stats(user_id: str) -> str:
                 resolved_user_id = user_result["steam_id"]
             else:
                 resolved_user_id = user_id
-            
+
             # Resolve user
             user = session.query(UserProfile).filter(
-                (UserProfile.steam_id == resolved_user_id) | 
+                (UserProfile.steam_id == resolved_user_id) |
                 (UserProfile.persona_name.ilike(resolved_user_id))
             ).first()
-            
+
             if not user:
                 return json.dumps({"error": f"User '{user_id}' not found"})
-            
+
             # Get user's games with genres
             user_games = session.query(UserGame).options(
                 joinedload(UserGame.game).joinedload(Game.genres)
             ).filter(UserGame.steam_id == user.steam_id).all()
-            
+
             # Calculate stats
             total_games = len(user_games)
             total_playtime = sum(ug.playtime_forever for ug in user_games)
             played_games = sum(1 for ug in user_games if ug.playtime_forever > 0)
             recent_playtime = sum(ug.playtime_2weeks for ug in user_games)
-            
+
             # Genre breakdown
             genre_stats = {}
             for ug in user_games:
@@ -290,7 +293,7 @@ def get_user_stats(user_id: str) -> str:
                         genre_stats[genre.genre_name] = {"count": 0, "playtime": 0}
                     genre_stats[genre.genre_name]["count"] += 1
                     genre_stats[genre.genre_name]["playtime"] += ug.playtime_forever
-            
+
             # Sort genres by playtime
             top_genres = sorted(
                 [{"genre": name, "count": data["count"], "playtime_hours": round(data["playtime"]/60, 1)}
@@ -298,7 +301,7 @@ def get_user_stats(user_id: str) -> str:
                 key=lambda x: x["playtime_hours"],
                 reverse=True
             )[:10]
-            
+
             stats_data = {
                 "user": user.persona_name,
                 "steam_id": user.steam_id,
@@ -311,9 +314,9 @@ def get_user_stats(user_id: str) -> str:
                 "average_playtime_hours": round(total_playtime / 60 / max(played_games, 1), 1),
                 "top_genres": top_genres
             }
-            
+
             return json.dumps(stats_data, indent=2)
-            
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get user stats: {str(e)}"})
 
@@ -324,7 +327,7 @@ def available_genres() -> str:
     try:
         with get_db() as session:
             genres = session.query(Genre).all()
-            
+
             genre_list = []
             for genre in genres:
                 game_count = len(genre.games)
@@ -333,16 +336,16 @@ def available_genres() -> str:
                         "name": genre.genre_name,
                         "game_count": game_count
                     })
-            
+
             # Sort by game count
             genre_list.sort(key=lambda x: x["game_count"], reverse=True)
-            
+
             genre_data = {
                 "total_genres": len(genre_list),
                 "genres": genre_list
             }
             return json.dumps(genre_data, indent=2)
-        
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get genres: {str(e)}"})
 
@@ -356,16 +359,16 @@ def get_games_by_genre(genre_name: str) -> str:
             genre = session.query(Genre).filter(
                 Genre.genre_name.ilike(f"%{genre_name}%")
             ).first()
-            
+
             if not genre:
                 return json.dumps({"error": f"Genre '{genre_name}' not found"})
-            
+
             # Get games in this genre with basic info
             games = session.query(Game).options(
                 joinedload(Game.developers),
                 joinedload(Game.reviews)
             ).join(Game.genres).filter(Genre.genre_id == genre.genre_id).all()
-            
+
             games_data = []
             for game in games:
                 game_info = {
@@ -374,27 +377,27 @@ def get_games_by_genre(genre_name: str) -> str:
                     "release_date": game.release_date,
                     "developers": [d.developer_name for d in game.developers]
                 }
-                
+
                 # Add review info if available
                 if game.reviews and game.reviews.review_summary:
                     game_info["reviews"] = {
                         "summary": game.reviews.review_summary,
                         "positive_percentage": game.reviews.positive_percentage
                     }
-                
+
                 games_data.append(game_info)
-            
+
             # Sort by name
             games_data.sort(key=lambda x: x["name"])
-            
+
             genre_games_data = {
                 "genre": genre.genre_name,
                 "total_games": len(games_data),
                 "games": games_data
             }
-            
+
             return json.dumps(genre_games_data, indent=2)
-            
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get games by genre: {str(e)}"})
 
@@ -405,47 +408,118 @@ def available_users() -> str:
     try:
         with get_db() as session:
             users = session.query(UserProfile).all()
-            
+
             user_list = []
             for user in users:
                 game_count = session.query(UserGame).filter_by(steam_id=user.steam_id).count()
-                
+
                 user_data = {
                     "steam_id": user.steam_id,
                     "persona_name": user.persona_name,
                     "game_count": game_count,
                     "steam_level": user.steam_level,
-                    "is_default": (user.steam_id == config.default_user or 
+                    "is_default": (user.steam_id == config.default_user or
                                  user.persona_name == config.default_user)
                 }
-                
+
                 if user.loccountrycode:
                     user_data["location"] = user.loccountrycode
                     if user.locstatecode:
                         user_data["location"] += f"-{user.locstatecode}"
-                
+
                 user_list.append(user_data)
-            
+
             users_data = {
                 "total_users": len(user_list),
                 "default_user": config.default_user,
                 "users": user_list
             }
             return json.dumps(users_data, indent=2)
-        
+
     except Exception as e:
         return json.dumps({"error": f"Failed to get users: {str(e)}"})
 
 
-@mcp.resource("config://settings")
-def get_settings() -> str:
-    """Get current server settings."""
-    settings_data = {
-        "server": "steam-librarian",
-        "host": config.host,
-        "port": config.port,
-        "default_user": config.default_user,
-        "database_type": config.database_url.split("://")[0],
-        "debug": config.debug
-    }
-    return json.dumps(settings_data, indent=2)
+@mcp.resource("library://tags")
+def available_tags() -> str:
+    """Get list of all available user-generated tags with game counts."""
+    try:
+        with get_db() as session:
+            tags = session.query(Tag).all()
+
+            tag_list = []
+            for tag in tags:
+                game_count = len(tag.games)
+                if game_count > 0:  # Only include tags that have games
+                    tag_list.append({
+                        "name": tag.tag_name,
+                        "game_count": game_count
+                    })
+
+            # Sort by game count (most popular first)
+            tag_list.sort(key=lambda x: x["game_count"], reverse=True)
+
+            tag_data = {
+                "total_tags": len(tag_list),
+                "tags": tag_list
+            }
+            return json.dumps(tag_data, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Failed to get tags: {str(e)}"})
+
+
+@mcp.resource("library://tags/{tag_name}")
+def get_games_by_tag(tag_name: str) -> str:
+    """Get all games that have a specific user-generated tag."""
+    try:
+        with get_db() as session:
+            # Find tag (case-insensitive partial match)
+            tag = session.query(Tag).filter(
+                Tag.tag_name.ilike(f"%{tag_name}%")
+            ).first()
+
+            if not tag:
+                return json.dumps({"error": f"Tag '{tag_name}' not found"})
+
+            # Get games with this tag with basic info
+            games = session.query(Game).options(
+                joinedload(Game.developers),
+                joinedload(Game.reviews),
+                joinedload(Game.genres)
+            ).join(Game.tags).filter(Tag.tag_id == tag.tag_id).all()
+
+            games_data = []
+            for game in games:
+                game_info = {
+                    "id": game.app_id,
+                    "name": game.name,
+                    "release_date": game.release_date,
+                    "developers": [d.developer_name for d in game.developers],
+                    "genres": [g.genre_name for g in game.genres]
+                }
+
+                # Add review info if available
+                if game.reviews and game.reviews.review_summary:
+                    game_info["reviews"] = {
+                        "summary": game.reviews.review_summary,
+                        "positive_percentage": game.reviews.positive_percentage
+                    }
+
+                games_data.append(game_info)
+
+            # Sort by name
+            games_data.sort(key=lambda x: x["name"])
+
+            tag_games_data = {
+                "tag": tag.tag_name,
+                "total_games": len(games_data),
+                "games": games_data
+            }
+
+            return json.dumps(tag_games_data, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Failed to get games by tag: {str(e)}"})
+
+
