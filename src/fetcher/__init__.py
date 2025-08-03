@@ -1,1 +1,3 @@
-# Steam Library Fetcher Module
+"""Steam Library Fetcher Module"""
+
+__version__ = "1.1.2"

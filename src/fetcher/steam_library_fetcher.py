@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from fetcher import __version__
 from shared.database import (
     Category,
     Developer,
@@ -38,6 +39,7 @@ from shared.database import (
     GameReview,
     Genre,
     Publisher,
+    Tag,
     UserGame,
     UserProfile,
     create_database,
@@ -154,6 +156,44 @@ class SteamLibraryFetcher:
             logger.debug(f"Error fetching app details for {appid}: {e}")
 
         return None
+
+    def get_app_tags(self, appid: int) -> list[str] | None:
+        """Get user-generated tags for an app from Steam store page"""
+        self._rate_limit()
+
+        url = f"https://store.steampowered.com/app/{appid}/"
+
+        try:
+            response = self.session.get(url, timeout=30)
+
+            if response.status_code == 200:
+                return self._extract_tags_from_html(response.text)
+            else:
+                logger.debug(f"Store page returned {response.status_code} for appid {appid}")
+
+        except Exception as e:
+            logger.debug(f"Error fetching tags for {appid}: {e}")
+
+        return None
+
+    def _extract_tags_from_html(self, html_content: str) -> list[str]:
+        """Extract tags from Steam store page HTML"""
+        import re
+
+        tags = []
+
+        # Pattern to match the tag links within the popular_tags section
+        pattern = r'<a[^>]+class="app_tag"[^>]*>(.*?)</a>'
+
+        matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+        for match in matches:
+            # Clean up the tag text (remove extra whitespace and newlines)
+            tag = re.sub(r"\s+", " ", match.strip())
+            if tag and tag != "+":  # Skip the '+' button
+                tags.append(tag)
+
+        return tags
 
     def get_app_reviews(self, appid: int) -> dict | None:
         """Get review summary for an app"""
@@ -371,50 +411,82 @@ class SteamLibraryFetcher:
         # Progress indicator
         logger.info(f"Processing [{index}/{total}]: {name} (AppID: {appid}) - Fetching fresh data")
 
-        game_info = {"appid": appid, "name": name, "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "maturity_rating": "Unknown", "required_age": 0, "content_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
+        game_info = {"appid": appid, "name": name, "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "short_description": "", "detailed_description": "", "about_the_game": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "tags": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
 
         # Get detailed app information
         app_details = self.get_app_details(appid)
         if app_details:
-            # Extract maturity/age rating info
+            # Required age (directly from API)
             try:
                 game_info["required_age"] = int(app_details.get("required_age", 0))
             except (ValueError, TypeError):
                 game_info["required_age"] = 0
 
-            # Content descriptors (mature content)
-            if "content_descriptors" in app_details:
-                descriptors = app_details["content_descriptors"]
-                notes = descriptors.get("notes", "")
-                game_info["content_descriptors"] = notes if notes else ""
+            # Short description
+            game_info["short_description"] = app_details.get("short_description", "")
 
-            # Genres
-            genres = app_details.get("genres", [])
-            game_info["genres"] = ", ".join([g.get("description", "") for g in genres])
+            # Detailed description
+            game_info["detailed_description"] = app_details.get("detailed_description", "")
 
-            # Categories
-            categories = app_details.get("categories", [])
-            game_info["categories"] = ", ".join([c.get("description", "") for c in categories])
+            # About the game
+            game_info["about_the_game"] = app_details.get("about_the_game", "")
 
-            # Developers and Publishers
-            game_info["developers"] = ", ".join(app_details.get("developers", []))
-            game_info["publishers"] = ", ".join(app_details.get("publishers", []))
+            # Recommendations total - handle None values
+            recommendations = app_details.get("recommendations") or {}
+            try:
+                game_info["recommendations_total"] = int(recommendations.get("total", 0))
+            except (ValueError, TypeError):
+                game_info["recommendations_total"] = 0
 
-            # Release date
-            release_date = app_details.get("release_date", {})
+            # Metacritic data - handle None values
+            metacritic = app_details.get("metacritic") or {}
+            try:
+                game_info["metacritic_score"] = int(metacritic.get("score", 0))
+            except (ValueError, TypeError):
+                game_info["metacritic_score"] = 0
+            game_info["metacritic_url"] = metacritic.get("url", "")
+
+            # Header image
+            game_info["header_image"] = app_details.get("header_image", "")
+
+            # Platforms - handle None values
+            platforms = app_details.get("platforms") or {}
+            game_info["platforms_windows"] = platforms.get("windows", False)
+            game_info["platforms_mac"] = platforms.get("mac", False)
+            game_info["platforms_linux"] = platforms.get("linux", False)
+
+            # Controller support
+            game_info["controller_support"] = app_details.get("controller_support", "")
+
+            # VR support (check categories for ID 31) - handle None values
+            categories = app_details.get("categories") or []
+            game_info["vr_support"] = any(cat.get("id") == 31 for cat in categories if cat)
+
+            # ESRB rating - handle None values
+            ratings = app_details.get("ratings") or {}
+            esrb = ratings.get("esrb") or {}
+            game_info["esrb_rating"] = esrb.get("rating", "")
+            game_info["esrb_descriptors"] = esrb.get("descriptors", "")
+
+            # PEGI rating - handle None values
+            pegi = ratings.get("pegi") or {}
+            game_info["pegi_rating"] = pegi.get("rating", "")
+            game_info["pegi_descriptors"] = pegi.get("descriptors", "")
+
+            # Genres - handle None values
+            genres = app_details.get("genres") or []
+            game_info["genres"] = ", ".join([g.get("description", "") for g in genres if g])
+
+            # Categories (as string for existing functionality) - handle None values
+            game_info["categories"] = ", ".join([c.get("description", "") for c in categories if c])
+
+            # Developers and Publishers - handle None values
+            game_info["developers"] = ", ".join(app_details.get("developers") or [])
+            game_info["publishers"] = ", ".join(app_details.get("publishers") or [])
+
+            # Release date - handle None values
+            release_date = app_details.get("release_date") or {}
             game_info["release_date"] = release_date.get("date", "")
-
-            # Determine maturity rating based on age requirement
-            if game_info["required_age"] >= 18:
-                game_info["maturity_rating"] = "Mature (18+)"
-            elif game_info["required_age"] >= 17:
-                game_info["maturity_rating"] = "Mature (17+)"
-            elif game_info["required_age"] >= 13:
-                game_info["maturity_rating"] = "Teen (13+)"
-            elif game_info["required_age"] > 0:
-                game_info["maturity_rating"] = f'Ages {game_info["required_age"]}+'
-            else:
-                game_info["maturity_rating"] = "Everyone"
 
         # Get review information
         reviews = self.get_app_reviews(appid)
@@ -424,6 +496,12 @@ class SteamLibraryFetcher:
             game_info["total_reviews"] = reviews.get("total_reviews", 0)
             game_info["positive_reviews"] = reviews.get("total_positive", 0)
             game_info["negative_reviews"] = reviews.get("total_negative", 0)
+
+        # Get user-generated tags
+        tags = self.get_app_tags(appid)
+        if tags:
+            game_info["tags"] = ", ".join(tags[:20])  # Limit to first 20 tags
+            logger.debug(f"Found {len(tags)} tags for {name}: {', '.join(tags[:5])}...")
 
         return game_info
 
@@ -436,16 +514,30 @@ class SteamLibraryFetcher:
             # Create or update game
             game = session.query(Game).filter_by(app_id=app_id).first()
             if not game:
-                game = Game(app_id=app_id, name=game_data["name"], maturity_rating=game_data.get("maturity_rating"), required_age=game_data.get("required_age", 0), content_descriptors=game_data.get("content_descriptors"), release_date=game_data.get("release_date"), last_updated=int(datetime.now().timestamp()) if not skip_details else None)
+                game = Game(app_id=app_id, name=game_data["name"], required_age=game_data.get("required_age", 0), short_description=game_data.get("short_description", ""), detailed_description=game_data.get("detailed_description", ""), about_the_game=game_data.get("about_the_game", ""), recommendations_total=game_data.get("recommendations_total", 0), metacritic_score=game_data.get("metacritic_score", 0), metacritic_url=game_data.get("metacritic_url", ""), header_image=game_data.get("header_image", ""), platforms_windows=game_data.get("platforms_windows", False), platforms_mac=game_data.get("platforms_mac", False), platforms_linux=game_data.get("platforms_linux", False), controller_support=game_data.get("controller_support", ""), vr_support=game_data.get("vr_support", False), esrb_rating=game_data.get("esrb_rating", ""), esrb_descriptors=game_data.get("esrb_descriptors", ""), pegi_rating=game_data.get("pegi_rating", ""), pegi_descriptors=game_data.get("pegi_descriptors", ""), release_date=game_data.get("release_date", ""), last_updated=int(datetime.now().timestamp()) if not skip_details else None)
                 session.add(game)
                 session.flush()
             elif not skip_details:
                 # Update existing game data only if we have fresh details
                 game.name = game_data["name"]
-                game.maturity_rating = game_data.get("maturity_rating")
                 game.required_age = game_data.get("required_age", 0)
-                game.content_descriptors = game_data.get("content_descriptors")
-                game.release_date = game_data.get("release_date")
+                game.short_description = game_data.get("short_description", "")
+                game.detailed_description = game_data.get("detailed_description", "")
+                game.about_the_game = game_data.get("about_the_game", "")
+                game.recommendations_total = game_data.get("recommendations_total", 0)
+                game.metacritic_score = game_data.get("metacritic_score", 0)
+                game.metacritic_url = game_data.get("metacritic_url", "")
+                game.header_image = game_data.get("header_image", "")
+                game.platforms_windows = game_data.get("platforms_windows", False)
+                game.platforms_mac = game_data.get("platforms_mac", False)
+                game.platforms_linux = game_data.get("platforms_linux", False)
+                game.controller_support = game_data.get("controller_support", "")
+                game.vr_support = game_data.get("vr_support", False)
+                game.esrb_rating = game_data.get("esrb_rating", "")
+                game.esrb_descriptors = game_data.get("esrb_descriptors", "")
+                game.pegi_rating = game_data.get("pegi_rating", "")
+                game.pegi_descriptors = game_data.get("pegi_descriptors", "")
+                game.release_date = game_data.get("release_date", "")
                 game.last_updated = int(datetime.now().timestamp())
 
             # Skip detailed updates if we're using skip_details
@@ -482,6 +574,14 @@ class SteamLibraryFetcher:
                         if cat_name.strip():
                             category = get_or_create(session, Category, category_name=cat_name.strip())
                             game.categories.append(category)
+
+                # Handle tags
+                if game_data.get("tags"):
+                    game.tags.clear()
+                    for tag_name in game_data["tags"].split(", "):
+                        if tag_name.strip():
+                            tag = get_or_create(session, Tag, tag_name=tag_name.strip())
+                            game.tags.append(tag)
 
                 # Handle reviews
                 if game_data.get("review_summary", "Unknown") != "Unknown" or game_data.get("total_reviews", 0) > 0:
@@ -549,7 +649,7 @@ class SteamLibraryFetcher:
                 failed_count += 1
                 logger.error(f"Error processing game {game.get('name', 'Unknown')}: {e}")
                 # Still save basic info even if detailed processing fails
-                fallback_data = {"appid": game.get("appid"), "name": game.get("name", "Unknown"), "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "maturity_rating": "Unknown", "required_age": 0, "content_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
+                fallback_data = {"appid": game.get("appid"), "name": game.get("name", "Unknown"), "playtime_forever": game.get("playtime_forever", 0), "playtime_2weeks": game.get("playtime_2weeks", 0), "required_age": 0, "short_description": "", "detailed_description": "", "about_the_game": "", "recommendations_total": 0, "metacritic_score": 0, "metacritic_url": "", "header_image": "", "platforms_windows": False, "platforms_mac": False, "platforms_linux": False, "controller_support": "", "vr_support": False, "esrb_rating": "", "esrb_descriptors": "", "pegi_rating": "", "pegi_descriptors": "", "genres": "", "categories": "", "developers": "", "publishers": "", "release_date": "", "review_summary": "Unknown", "review_score": 0, "total_reviews": 0, "positive_reviews": 0, "negative_reviews": 0}
                 try:
                     self.save_to_database(fallback_data, steam_id)
                     processed_count += 1
@@ -660,6 +760,9 @@ def main():
     # Set debug logging if requested
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Log version information
+    logger.info(f"Steam Library Fetcher v{__version__} starting...")
 
     # Get environment variables (support both .env and env vars)
     steam_id = os.getenv("STEAM_ID")

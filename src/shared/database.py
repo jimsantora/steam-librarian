@@ -111,6 +111,8 @@ game_publishers = Table("game_publishers", Base.metadata, Column("app_id", Integ
 
 game_categories = Table("game_categories", Base.metadata, Column("app_id", Integer, ForeignKey("games.app_id"), primary_key=True), Column("category_id", Integer, ForeignKey("categories.category_id"), primary_key=True))
 
+game_tags = Table("game_tags", Base.metadata, Column("app_id", Integer, ForeignKey("games.app_id"), primary_key=True), Column("tag_id", Integer, ForeignKey("tags.tag_id"), primary_key=True))
+
 # Association table for friends relationships
 friends_association = Table("friends", Base.metadata, Column("user_steam_id", String, ForeignKey("user_profile.steam_id"), primary_key=True), Column("friend_steam_id", String, ForeignKey("user_profile.steam_id"), primary_key=True), Column("relationship", String), Column("friend_since", Integer), Index("idx_friends_user_steam_id", "user_steam_id"), Index("idx_friends_friend_steam_id", "friend_steam_id"))  # 'friend' or 'all'  # Unix timestamp
 
@@ -143,14 +145,24 @@ class Game(Base):
 
     app_id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    maturity_rating = Column(String)
     required_age = Column(Integer, default=0)
-    content_descriptors = Column(Text)
-    release_date = Column(String)
+    short_description = Column(Text)
+    detailed_description = Column(Text)
+    about_the_game = Column(Text)
+    recommendations_total = Column(Integer)
     metacritic_score = Column(Integer)
-    steam_deck_verified = Column(Boolean, default=False)
+    metacritic_url = Column(String)
+    header_image = Column(String)
+    platforms_windows = Column(Boolean, default=False)
+    platforms_mac = Column(Boolean, default=False)
+    platforms_linux = Column(Boolean, default=False)
     controller_support = Column(String)
     vr_support = Column(Boolean, default=False)
+    esrb_rating = Column(String)
+    esrb_descriptors = Column(Text)
+    pegi_rating = Column(String)
+    pegi_descriptors = Column(Text)
+    release_date = Column(String)
     last_updated = Column(Integer, default=lambda: int(datetime.now().timestamp()))
 
     # Relationships
@@ -160,11 +172,12 @@ class Game(Base):
     developers = relationship("Developer", secondary=game_developers, back_populates="games")
     publishers = relationship("Publisher", secondary=game_publishers, back_populates="games")
     categories = relationship("Category", secondary=game_categories, back_populates="games")
+    tags = relationship("Tag", secondary=game_tags, back_populates="games")
 
     # Indexes for search and filtering
     __table_args__ = (
         Index("idx_games_name", "name"),
-        Index("idx_games_maturity_rating", "maturity_rating"),
+        Index("idx_games_esrb_rating", "esrb_rating"),
     )
 
 
@@ -237,6 +250,16 @@ class Category(Base):
 
     # Relationships
     games = relationship("Game", secondary=game_categories, back_populates="categories")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    tag_id = Column(Integer, primary_key=True, autoincrement=True)
+    tag_name = Column(String, unique=True, nullable=False)
+
+    # Relationships
+    games = relationship("Game", secondary=game_tags, back_populates="tags")
 
 
 class GameReview(Base):

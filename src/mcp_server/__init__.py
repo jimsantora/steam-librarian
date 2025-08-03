@@ -1,3 +1,6 @@
-"""Steam Librarian MCP Server - Your Intelligent Gaming Companion"""
+"""Simplified Steam Librarian MCP Server"""
 
-__version__ = "2.0.0"
+# Import all modules to register MCP decorators
+from . import completions, prompts, resources, tools
+
+__version__ = "1.1.2"
