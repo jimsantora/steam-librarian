@@ -43,9 +43,9 @@ async def tool_argument_completions(
                 "60", "70", "75", "80", "85", "90"
             ], hasMore=False)
 
-        if argument.name == "max_hours" and tool_name == "find_short_games":
+        if argument.name == "session_length" and tool_name == "find_quick_session_games":
             return Completion(values=[
-                "0.5", "1.0", "2.0", "3.0", "5.0"
+                "short", "medium", "long"
             ], hasMore=False)
 
     return None

@@ -179,20 +179,20 @@ class SteamLibraryFetcher:
     def _extract_tags_from_html(self, html_content: str) -> list[str]:
         """Extract tags from Steam store page HTML"""
         import re
-        
+
         tags = []
-        
+
         # Pattern to match the tag links within the popular_tags section
         pattern = r'<a[^>]+class="app_tag"[^>]*>(.*?)</a>'
-        
+
         matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
-        
+
         for match in matches:
             # Clean up the tag text (remove extra whitespace and newlines)
             tag = re.sub(r'\s+', ' ', match.strip())
             if tag and tag != '+':  # Skip the '+' button
                 tags.append(tag)
-        
+
         return tags
 
     def get_app_reviews(self, appid: int) -> dict | None:

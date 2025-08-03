@@ -16,7 +16,7 @@ Intelligent tools for game discovery and library analysis:
 - **`find_unplayed_gems`** - Highly-rated games in backlog
 - **`find_multiplayer_games`** - Games by multiplayer type (coop, pvp, local, online)
 - **`find_games_by_platform`** - Platform-specific games (Windows, Mac, Linux, VR)
-- **`find_short_games`** - Games suitable for quick sessions
+- **`find_quick_session_games`** - Games perfect for quick gaming sessions (5-60 minutes)
 - **`generate_recommendation`** - LLM-powered game recommendations
 - **`find_games_with_preferences`** - Interactive preference-based discovery
 
@@ -165,6 +165,12 @@ find_games_by_platform("vr")
 # Backlog management
 find_unplayed_gems(min_rating=80)
 # → Unplayed games with Metacritic ≥ 80
+
+# Quick session gaming
+find_quick_session_games(session_length="short")
+# → Games perfect for 5-15 minute sessions using community tags
+# → Mix of played games (85%) and unplayed gems with good reviews (15%)
+# → Shows 🔥 recently played, ⭐ favorites, 🆕 unplayed gems (75%+ reviews)
 ```
 
 ### Resource Access
