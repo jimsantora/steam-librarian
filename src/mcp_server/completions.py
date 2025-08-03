@@ -28,20 +28,6 @@ async def tool_argument_completions(
                 "3", "5", "7", "10", "13", "16"
             ], hasMore=False)
 
-        if argument.name == "type" and tool_name == "find_multiplayer_games":
-            return Completion(values=[
-                "coop", "pvp", "local", "online"
-            ], hasMore=False)
-
-        if argument.name == "platform" and tool_name == "find_games_by_platform":
-            return Completion(values=[
-                "windows", "mac", "linux", "vr"
-            ], hasMore=False)
-
-        if argument.name == "min_rating" and tool_name == "find_unplayed_gems":
-            return Completion(values=[
-                "60", "70", "75", "80", "85", "90"
-            ], hasMore=False)
 
         if argument.name == "session_length" and tool_name == "find_quick_session_games":
             return Completion(values=[

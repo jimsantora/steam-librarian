@@ -7,28 +7,35 @@ The Steam Librarian MCP (Model Context Protocol) Server provides AI-powered acce
 ## Features
 
 ### 🛠️ MCP Tools
-Intelligent tools for game discovery and library analysis:
+Intelligent tools for advanced analysis and AI-powered recommendations:
 
-- **`search_games`** - Natural language game search with smart mappings
-- **`analyze_library`** - Comprehensive library statistics and insights  
-- **`get_game_details`** - Detailed game information with user stats
-- **`find_family_games`** - Age-appropriate games with ESRB/PEGI filtering
-- **`find_unplayed_gems`** - Highly-rated games in backlog
-- **`find_multiplayer_games`** - Games by multiplayer type (coop, pvp, local, online)
-- **`find_games_by_platform`** - Platform-specific games (Windows, Mac, Linux, VR)
-- **`find_quick_session_games`** - Games perfect for quick gaming sessions (5-60 minutes)
+- **`search_games`** - Natural language game search with smart mappings and AI interpretation
+- **`analyze_library`** - Comprehensive library statistics with AI-generated insights  
+- **`find_family_games`** - Age-appropriate games with ESRB/PEGI filtering and elicitation
+- **`find_quick_session_games`** - Smart tag-based analysis for quick gaming sessions (5-60 minutes)
 - **`generate_recommendation`** - LLM-powered game recommendations
-- **`find_games_with_preferences`** - Interactive preference-based discovery
+- **`find_games_with_preferences`** - Interactive preference-based discovery with elicitation
 
 ### 📊 MCP Resources
-Structured data access for library exploration:
+Structured data access for library exploration and simple filtering:
 
+**Library Navigation:**
 - **`library://overview`** - Library statistics and server status
 - **`library://users`** - Available users in database
 - **`library://users/{user_id}`** - User profile information
 - **`library://users/{user_id}/games`** - User's game library
 - **`library://users/{user_id}/stats`** - User gaming statistics
-- **`library://games/{game_id}`** - Detailed game information
+
+**Game Information:**
+- **`library://games/{game_id}`** - Comprehensive game details with all metadata and user stats
+  - Complete descriptions, release info, classification (genres/categories/tags)
+  - Platform support, ratings (ESRB/PEGI), review statistics
+  - User-specific data: playtime, achievements, ownership status
+- **`library://games/platform/{platform}`** - Games by platform (windows, mac, linux, vr)
+- **`library://games/multiplayer/{type}`** - Games by multiplayer type (coop, pvp, local, online)
+- **`library://games/unplayed`** - Highly-rated unplayed games (metacritic ≥75)
+
+**Classification & Discovery:**
 - **`library://genres`** - Available game genres with counts
 - **`library://genres/{genre_name}`** - Games by genre
 - **`library://tags`** - Available user-generated tags with counts
@@ -59,7 +66,8 @@ src/mcp_server/
 
 ### Key Design Principles
 - **Consolidated Architecture**: All tools, resources, and prompts in single files
-- **Personal Library Focus**: Default user handling for single-user scenarios
+- **Clear Separation**: Tools for intelligent analysis, Resources for data access
+- **Personal Library Focus**: Default user handling for single-user scenarios  
 - **Rich Game Intelligence**: Uses genres, categories, and user-generated tags
 - **Database-First**: Direct SQLAlchemy ORM queries for performance
 - **Error Resilience**: Graceful handling of missing users or data
@@ -154,17 +162,9 @@ search_games("coop games")
 
 ### Intelligent Recommendations
 ```python
-# Age-appropriate filtering
+# Age-appropriate filtering with elicitation
 find_family_games(child_age=8)
-# → ESRB ≤ E, PEGI ≤ 7, Family Sharing category
-
-# Platform-specific discovery
-find_games_by_platform("vr")
-# → Games with VR support detected from categories
-
-# Backlog management
-find_unplayed_gems(min_rating=80)
-# → Unplayed games with Metacritic ≥ 80
+# → ESRB ≤ E, PEGI ≤ 7, Family Sharing category, optional content preferences
 
 # Quick session gaming
 find_quick_session_games(session_length="short")
@@ -182,6 +182,22 @@ curl "http://localhost:8000/mcp" -X POST \
 # Find roguelike games  
 curl "http://localhost:8000/mcp" -X POST \
   -d '{"method": "resources/read", "params": {"uri": "library://tags/roguelike"}}'
+
+# Get VR games
+curl "http://localhost:8000/mcp" -X POST \
+  -d '{"method": "resources/read", "params": {"uri": "library://games/platform/vr"}}'
+
+# Get cooperative games
+curl "http://localhost:8000/mcp" -X POST \
+  -d '{"method": "resources/read", "params": {"uri": "library://games/multiplayer/coop"}}'
+
+# Get unplayed gems
+curl "http://localhost:8000/mcp" -X POST \
+  -d '{"method": "resources/read", "params": {"uri": "library://games/unplayed"}}'
+
+# Get comprehensive game details (example: Team Fortress 2)
+curl "http://localhost:8000/mcp" -X POST \
+  -d '{"method": "resources/read", "params": {"uri": "library://games/440"}}'
 ```
 
 ## Advanced Features

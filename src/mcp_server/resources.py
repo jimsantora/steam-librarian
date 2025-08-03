@@ -5,6 +5,7 @@ import json
 from sqlalchemy.orm import joinedload
 
 from shared.database import (
+    Category,
     Game,
     Genre,
     Tag,
@@ -26,9 +27,15 @@ def get_default_user_fallback():
 
 
 @mcp.resource("library://games/{game_id}")
-def get_game(game_id: str) -> str:
-    """Get game details by ID."""
+def get_game_details(game_id: str) -> str:
+    """Get comprehensive game details by ID with all available metadata."""
     try:
+        # Try to get default user for personalized stats
+        user_steam_id = None
+        user_result = resolve_user_for_tool(None, get_default_user_fallback)
+        if "error" not in user_result:
+            user_steam_id = user_result["steam_id"]
+
         with get_db() as session:
             # Load game with all relationships
             game = session.query(Game).options(
@@ -36,38 +43,94 @@ def get_game(game_id: str) -> str:
                 joinedload(Game.developers),
                 joinedload(Game.publishers),
                 joinedload(Game.categories),
-                joinedload(Game.reviews)
+                joinedload(Game.reviews),
+                joinedload(Game.tags)
             ).filter_by(app_id=int(game_id)).first()
 
-            if game:
-                game_data = {
-                    "id": game.app_id,
-                    "name": game.name,
-                    "genres": [g.genre_name for g in game.genres],
-                    "developers": [d.developer_name for d in game.developers],
-                    "publishers": [p.publisher_name for p in game.publishers],
-                    "categories": [c.category_name for c in game.categories],
-                    "release_date": game.release_date,
-                    "esrb_rating": game.esrb_rating,
-                    "required_age": game.required_age,
-                    "esrb_descriptors": game.esrb_descriptors
-                }
-
-                # Add review data if available
-                if game.reviews:
-                    game_data["reviews"] = {
-                        "summary": game.reviews.review_summary,
-                        "score": game.reviews.review_score,
-                        "total": game.reviews.total_reviews,
-                        "positive_percentage": game.reviews.positive_percentage
-                    }
-
-                return json.dumps(game_data, indent=2)
-            else:
+            if not game:
                 return json.dumps({"error": f"Game with ID {game_id} not found"})
 
+            # Build comprehensive game data
+            game_data = {
+                "id": game.app_id,
+                "name": game.name,
+                "short_description": game.short_description,
+                "about_the_game": game.about_the_game,
+                
+                # Release Information
+                "release_date": game.release_date,
+                "developers": [d.developer_name for d in game.developers],
+                "publishers": [p.publisher_name for p in game.publishers],
+                
+                # Classification & Ratings
+                "genres": [g.genre_name for g in game.genres],
+                "categories": [c.category_name for c in game.categories],
+                "tags": [t.tag_name for t in game.tags],
+                "required_age": game.required_age,
+                "esrb_rating": game.esrb_rating,
+                "esrb_descriptors": game.esrb_descriptors,
+                "pegi_rating": game.pegi_rating,
+                "pegi_descriptors": game.pegi_descriptors,
+                
+                # Platform Support
+                "platforms": {
+                    "windows": game.platforms_windows,
+                    "mac": game.platforms_mac,
+                    "linux": game.platforms_linux
+                },
+                "vr_support": game.vr_support,
+                "controller_support": game.controller_support,
+                
+                # Scores & Reviews
+                "metacritic_score": game.metacritic_score,
+                "metacritic_url": game.metacritic_url
+            }
+
+            # Add detailed review data if available
+            if game.reviews:
+                game_data["reviews"] = {
+                    "summary": game.reviews.review_summary,
+                    "score": game.reviews.review_score,
+                    "total_reviews": game.reviews.total_reviews,
+                    "positive_reviews": game.reviews.positive_reviews,
+                    "negative_reviews": game.reviews.negative_reviews,
+                    "positive_percentage": game.reviews.positive_percentage,
+                    "review_score_desc": game.reviews.review_score_desc
+                }
+
+            # Add user-specific data if available
+            if user_steam_id:
+                user_game = session.query(UserGame).filter_by(
+                    steam_id=user_steam_id,
+                    app_id=game.app_id
+                ).first()
+
+                if user_game:
+                    game_data["user_stats"] = {
+                        "owned": True,
+                        "playtime_forever_minutes": user_game.playtime_forever,
+                        "playtime_forever_hours": round(user_game.playtime_forever / 60, 2),
+                        "playtime_2weeks_minutes": user_game.playtime_2weeks,
+                        "playtime_2weeks_hours": round(user_game.playtime_2weeks / 60, 2),
+                        "last_played": user_game.last_played,
+                        "achievements_total": user_game.achievements_total,
+                        "achievements_unlocked": user_game.achievements_unlocked,
+                        "achievement_percentage": round((user_game.achievements_unlocked / max(user_game.achievements_total, 1)) * 100, 1) if user_game.achievements_total else 0
+                    }
+                else:
+                    game_data["user_stats"] = {
+                        "owned": False,
+                        "note": "Game not in user's library"
+                    }
+            else:
+                game_data["user_stats"] = {
+                    "note": "No user context available for personalized stats"
+                }
+
+            return json.dumps(game_data, indent=2)
+
     except Exception as e:
-        return json.dumps({"error": f"Failed to get game: {str(e)}"})
+        return json.dumps({"error": f"Failed to get game details: {str(e)}"})
 
 
 @mcp.resource("library://overview")
@@ -120,16 +183,21 @@ def library_overview() -> str:
                     "user_games": "library://users/{user_id}/games - Get user's complete game library",
                     "user_stats": "library://users/{user_id}/stats - Get user's gaming statistics",
                     "game_details": "library://games/{game_id} - Get detailed game information",
+                    "platform_games": "library://games/platform/{platform} - Games by platform (windows/mac/linux/vr)",
+                    "multiplayer_games": "library://games/multiplayer/{type} - Games by multiplayer type (coop/pvp/local/online)",
+                    "unplayed_games": "library://games/unplayed - Highly-rated unplayed games",
                     "genres": "library://genres - List all genres",
                     "games_by_genre": "library://genres/{genre_name}/games - Get games in specific genre",
-                    "server_config": "config://settings - Server configuration"
+                    "tags": "library://tags - List all community tags",
+                    "games_by_tag": "library://tags/{tag_name} - Get games with specific tag"
                 },
                 "tools_available": [
-                    "search_games - Natural language search in user's library",
-                    "analyze_library - Deep analysis of user's gaming patterns",
+                    "search_games - Natural language search with AI interpretation",
+                    "analyze_library - Deep analysis with AI-generated insights",
                     "generate_recommendation - AI-powered game recommendations",
-                    "find_games_with_preferences - Interactive preference-based search",
-                    "get_game_details - Detailed game information with user stats"
+                    "find_games_with_preferences - Interactive preference-based search with elicitation",
+                    "find_family_games - Age-appropriate games with ESRB/PEGI filtering",
+                    "find_quick_session_games - Smart tag-based analysis for quick sessions"
                 ]
             }
 
@@ -521,5 +589,180 @@ def get_games_by_tag(tag_name: str) -> str:
 
     except Exception as e:
         return json.dumps({"error": f"Failed to get games by tag: {str(e)}"})
+
+
+@mcp.resource("library://games/platform/{platform}")
+def get_games_by_platform(platform: str) -> str:
+    """Get games compatible with specific platform (windows, mac, linux, vr)."""
+    try:
+        # Use default user for personal library context
+        user_result = resolve_user_for_tool(None, get_default_user_fallback)
+        if "error" in user_result:
+            return json.dumps({"error": f"User error: {user_result['message']}"})
+
+        user_steam_id = user_result["steam_id"]
+
+        # Platform mapping
+        platform_field_map = {
+            "windows": "platforms_windows", 
+            "mac": "platforms_mac",
+            "linux": "platforms_linux",
+            "vr": "vr_support"
+        }
+
+        if platform not in platform_field_map:
+            return json.dumps({"error": f"Invalid platform '{platform}'. Use: windows, mac, linux, or vr"})
+
+        with get_db() as session:
+            platform_field = platform_field_map[platform]
+
+            games_query = session.query(Game, UserGame).join(
+                UserGame,
+                (Game.app_id == UserGame.app_id) &
+                (UserGame.steam_id == user_steam_id)
+            ).filter(
+                getattr(Game, platform_field) == True
+            ).order_by(
+                UserGame.playtime_forever.desc()
+            ).limit(50)
+
+            games_data = []
+            for game, user_game in games_query:
+                game_info = {
+                    "id": game.app_id,
+                    "name": game.name,
+                    "playtime_hours": round(user_game.playtime_forever / 60, 1),
+                    "controller_support": game.controller_support,
+                    "release_date": game.release_date
+                }
+                games_data.append(game_info)
+
+            platform_data = {
+                "platform": platform,
+                "user": user_result["display_name"], 
+                "total_games": len(games_data),
+                "games": games_data
+            }
+
+            return json.dumps(platform_data, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Failed to get games by platform: {str(e)}"})
+
+
+@mcp.resource("library://games/multiplayer/{type}")
+def get_multiplayer_games(type: str) -> str:
+    """Get multiplayer games by type (coop, pvp, local, online)."""
+    try:
+        # Use default user for personal library context
+        user_result = resolve_user_for_tool(None, get_default_user_fallback)
+        if "error" in user_result:
+            return json.dumps({"error": f"User error: {user_result['message']}"})
+
+        user_steam_id = user_result["steam_id"]
+
+        # Map type to category names
+        type_to_categories = {
+            "coop": ["Co-op", "Online Co-op"],
+            "pvp": ["PvP", "Online PvP"], 
+            "local": ["Shared/Split Screen", "Local Co-op"],
+            "online": ["Multi-player", "Online Multi-Player", "Online Co-op", "Online PvP"]
+        }
+
+        if type not in type_to_categories:
+            return json.dumps({"error": f"Invalid type '{type}'. Use: coop, pvp, local, or online"})
+
+        target_categories = type_to_categories[type]
+
+        with get_db() as session:
+            # Find games with specified multiplayer type
+            games_query = session.query(Game, UserGame).join(
+                UserGame,
+                (Game.app_id == UserGame.app_id) &
+                (UserGame.steam_id == user_steam_id)
+            ).join(Game.categories).filter(
+                Category.category_name.in_(target_categories)
+            ).distinct().limit(30)
+
+            games_data = []
+            for game, user_game in games_query:
+                # Get all multiplayer categories for this game
+                mp_categories = [c.category_name for c in game.categories
+                               if "player" in c.category_name.lower() or
+                                  "co-op" in c.category_name.lower() or
+                                  "pvp" in c.category_name.lower()]
+                
+                game_info = {
+                    "id": game.app_id,
+                    "name": game.name,
+                    "multiplayer_modes": mp_categories,
+                    "playtime_hours": round(user_game.playtime_forever / 60, 1),
+                    "release_date": game.release_date
+                }
+                games_data.append(game_info)
+
+            multiplayer_data = {
+                "multiplayer_type": type,
+                "user": user_result["display_name"],
+                "total_games": len(games_data),
+                "games": games_data
+            }
+
+            return json.dumps(multiplayer_data, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Failed to get multiplayer games: {str(e)}"})
+
+
+@mcp.resource("library://games/unplayed")
+def get_unplayed_gems() -> str:
+    """Get highly-rated unplayed games (default min_rating=75)."""
+    try:
+        # Use default user for personal library context
+        user_result = resolve_user_for_tool(None, get_default_user_fallback)
+        if "error" in user_result:
+            return json.dumps({"error": f"User error: {user_result['message']}"})
+
+        user_steam_id = user_result["steam_id"]
+        min_rating = 75  # Default rating threshold
+
+        with get_db() as session:
+            # Find unplayed games with high ratings
+            unplayed_games = session.query(Game, UserGame).join(
+                UserGame,
+                (Game.app_id == UserGame.app_id) &
+                (UserGame.steam_id == user_steam_id)
+            ).filter(
+                UserGame.playtime_forever == 0,  # Never played
+                Game.metacritic_score >= min_rating
+            ).order_by(
+                Game.metacritic_score.desc()
+            ).limit(20)
+
+            games_data = []
+            for game, user_game in unplayed_games:
+                genre_names = [g.genre_name for g in game.genres[:3]]
+                
+                game_info = {
+                    "id": game.app_id,
+                    "name": game.name,
+                    "metacritic_score": game.metacritic_score,
+                    "genres": genre_names,
+                    "short_description": game.short_description[:150] + "..." if game.short_description and len(game.short_description) > 150 else game.short_description,
+                    "release_date": game.release_date
+                }
+                games_data.append(game_info)
+
+            unplayed_data = {
+                "user": user_result["display_name"],
+                "min_rating": min_rating,
+                "total_games": len(games_data),
+                "games": games_data
+            }
+
+            return json.dumps(unplayed_data, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Failed to get unplayed gems: {str(e)}"})
 
 
