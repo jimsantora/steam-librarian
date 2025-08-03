@@ -16,7 +16,6 @@ from shared.database import (
     UserProfile,
     game_categories,
     game_genres,
-    game_tags,
     get_db,
     handle_user_not_found,
     resolve_user_for_tool,
@@ -162,9 +161,12 @@ async def search_games(
         output = [f"**Search results for '{query}':**\n"]
         for game in results:
             platforms = []
-            if game["platforms"]["windows"]: platforms.append("Win")
-            if game["platforms"]["mac"]: platforms.append("Mac")
-            if game["platforms"]["linux"]: platforms.append("Linux")
+            if game["platforms"]["windows"]:
+                platforms.append("Win")
+            if game["platforms"]["mac"]:
+                platforms.append("Mac")
+            if game["platforms"]["linux"]:
+                platforms.append("Linux")
             platform_str = "/".join(platforms) if platforms else "Unknown"
 
             metacritic_str = f" ({game['metacritic']}/100)" if game["metacritic"] else ""
@@ -333,9 +335,9 @@ async def analyze_library(
 
         # Platform compatibility
         platform_stats = session.query(
-            func.sum(case((Game.platforms_windows == True, 1), else_=0)).label('windows'),
-            func.sum(case((Game.platforms_mac == True, 1), else_=0)).label('mac'),
-            func.sum(case((Game.platforms_linux == True, 1), else_=0)).label('linux')
+            func.sum(case((Game.platforms_windows, 1), else_=0)).label('windows'),
+            func.sum(case((Game.platforms_mac, 1), else_=0)).label('mac'),
+            func.sum(case((Game.platforms_linux, 1), else_=0)).label('linux')
         ).filter(Game.app_id.in_(game_ids)).first()
 
         # Build analysis with new insights
@@ -373,7 +375,7 @@ async def analyze_library(
 
                 if insights.content.type == "text":
                     analysis += f"\n\n**AI Insights**:\n{insights.content.text}"
-            except:
+            except Exception:
                 pass  # Continue without AI insights
 
         return analysis
@@ -493,9 +495,9 @@ async def find_family_games(
             )
 
             if result.action == "accept" and result.data:
-                preferences = result.data
                 # Add filters based on content_concerns
                 # This will be used in the filtering logic below
+                pass
         except Exception:
             # Continue without preferences if elicitation fails
             pass
@@ -685,11 +687,14 @@ async def find_games_by_platform(
 
 
 @mcp.tool()
-async def find_short_games(
-    max_hours: float = 2.0,
+async def find_quick_session_games(
+    session_length: str = "short",
     user: str | None = None
 ) -> str:
-    """Find games suitable for quick gaming sessions."""
+    """Find games perfect for quick gaming sessions (5-60 minutes).
+    
+    Session lengths: 'short' (5-15 min), 'medium' (15-30 min), 'long' (30-60 min)
+    """
     # Resolve user
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
@@ -697,29 +702,163 @@ async def find_short_games(
 
     user_steam_id = user_result["steam_id"]
 
+    # Define quick session tags based on analysis
+    quick_session_tags = [
+        "Arcade", "Casual", "Puzzle", "Score Attack", "Fast-Paced",
+        "Bullet Hell", "Shoot 'Em Up", "Twin Stick Shooter", "Card Game",
+        "Runner", "Time Attack", "Puzzle Platformer", "Beat 'em up",
+        "Party Game", "Addictive"
+    ]
+
+    # Tags to exclude (suggest longer sessions)
+    long_session_tags = [
+        "Open World", "Story Rich", "JRPG", "RPG", "Strategy",
+        "Turn-Based Strategy", "4X", "Grand Strategy", "Survival",
+        "Open World Survival Craft", "City Builder", "Management"
+    ]
+
     with get_db() as session:
-        # Find games with low average playtime or casual genre
-        short_games = session.query(Game, UserGame).join(
+        # Build query for games with quick session tags
+        quick_games_query = session.query(Game, UserGame).join(
             UserGame,
             (Game.app_id == UserGame.app_id) &
             (UserGame.steam_id == user_steam_id)
-        ).join(Game.genres).filter(
-            or_(
-                Genre.genre_name.in_(["Casual", "Indie", "Racing", "Sports"]),
-                UserGame.playtime_forever < max_hours * 60  # Already played briefly
+        ).join(Game.tags).filter(
+            Tag.tag_name.in_(quick_session_tags)
+        )
+
+        # Exclude games with long session tags
+        long_session_game_ids = session.query(Game.app_id).join(Game.tags).filter(
+            Tag.tag_name.in_(long_session_tags)
+        ).subquery()
+
+        quick_games_query = quick_games_query.filter(
+            ~Game.app_id.in_(long_session_game_ids)
+        )
+
+        # Additional filtering based on session length preference
+        if session_length == "short":
+            # Prefer very quick games - add extra weight to arcade/puzzle
+            quick_games_query = quick_games_query.filter(
+                Tag.tag_name.in_(["Arcade", "Casual", "Puzzle", "Score Attack", "Fast-Paced"])
             )
-        ).distinct().limit(15).all()
+        elif session_length == "medium":
+            # Include slightly longer but still session-based games
+            pass  # Use all quick_session_tags
+        elif session_length == "long":
+            # Allow some strategy/rpg elements but still session-friendly
+            quick_games_query = quick_games_query.filter(
+                or_(
+                    Tag.tag_name.in_(quick_session_tags),
+                    and_(
+                        Tag.tag_name.in_(["Turn-Based", "Tactical", "Card Battler"]),
+                        ~Tag.tag_name.in_(long_session_tags)
+                    )
+                )
+            )
 
-        if not short_games:
-            return f"No games found for quick sessions (< {max_hours} hours)"
+        quick_games = quick_games_query.distinct().all()
 
-        results = [f"Games for quick sessions (< {max_hours} hours):\n"]
-        for game, user_game in short_games:
+        # Separate played and unplayed games
+        played_games = []
+        unplayed_games = []
+        total_playtimes = []
+        
+        for game, user_game in quick_games:
+            if user_game.playtime_forever > 0:
+                played_games.append((game, user_game))
+                total_playtimes.append(user_game.playtime_forever)
+            else:
+                unplayed_games.append((game, user_game))
+
+        # Calculate threshold for "favorites" - top 25% by playtime (minimum 1 hour)
+        if total_playtimes:
+            sorted_playtimes = sorted(total_playtimes, reverse=True)
+            if len(sorted_playtimes) >= 4:  # Need at least 4 played games
+                favorite_threshold = sorted_playtimes[len(sorted_playtimes) // 4]  # Top 25%
+                favorite_threshold = max(favorite_threshold, 60)  # Minimum 1 hour
+            else:
+                favorite_threshold = 60  # Default to 1 hour minimum
+        else:
+            favorite_threshold = 60
+
+        # Sort played games by total playtime (favorites first), then by recent activity
+        played_games.sort(key=lambda x: (x[1].playtime_forever, x[1].playtime_2weeks), reverse=True)
+
+        # Sort unplayed games by review score (if available), then by metacritic score
+        unplayed_with_reviews = []
+        for game, user_game in unplayed_games:
+            review_score = 0
+            if game.reviews and game.reviews.positive_percentage:
+                review_score = game.reviews.positive_percentage
+            elif game.metacritic_score:
+                review_score = game.metacritic_score  # Use metacritic as fallback
+            unplayed_with_reviews.append((game, user_game, review_score))
+        
+        # Sort by review score and keep only well-reviewed games (>75% or >75 metacritic)
+        unplayed_with_reviews.sort(key=lambda x: x[2], reverse=True)
+        good_unplayed = [(g, ug) for g, ug, score in unplayed_with_reviews if score >= 75]
+
+        # Mix results: ~85% played games, ~15% good unplayed games
+        target_total = 15
+        target_unplayed = min(3, len(good_unplayed))  # Max 3 unplayed games (20%)
+        target_played = target_total - target_unplayed
+
+        analyzed_games = played_games[:target_played] + good_unplayed[:target_unplayed]
+
+        if not analyzed_games:
+            return f"No games found for {session_length} gaming sessions"
+
+        # Format results with session recommendations
+        session_desc = {
+            "short": "5-15 minute",
+            "medium": "15-30 minute",
+            "long": "30-60 minute"
+        }
+
+        results = [
+            f"**Games perfect for {session_desc[session_length]} sessions:**",
+            f"🔥 = Recently played | ⭐ = Your favorites | 🆕 = Unplayed gems (good reviews)\n"
+        ]
+
+        for game, user_game in analyzed_games:
+            # Get relevant tags for this game
+            game_tags = [tag.tag_name for tag in game.tags if tag.tag_name in quick_session_tags]
+
             playtime_info = f"Played: {user_game.playtime_forever / 60:.1f}h" if user_game.playtime_forever > 0 else "Unplayed"
+
+            # Add activity indicator
+            activity_indicator = ""
+            if user_game.playtime_2weeks > 0:
+                activity_indicator = " 🔥"  # Recently active
+            elif user_game.playtime_forever == 0:
+                activity_indicator = " 🆕"  # Unplayed gems
+            elif user_game.playtime_forever >= favorite_threshold:
+                activity_indicator = " ⭐"  # Your favorites
+
+            # Add session reason
+            session_reason = ""
+            if "Arcade" in game_tags:
+                session_reason = "Quick arcade action"
+            elif "Puzzle" in game_tags:
+                session_reason = "Bite-sized puzzles"
+            elif "Card Game" in game_tags:
+                session_reason = "Quick card matches"
+            elif "Score Attack" in game_tags:
+                session_reason = "Score competition"
+            elif "Casual" in game_tags:
+                session_reason = "Relaxed gameplay"
+            elif "Fast-Paced" in game_tags:
+                session_reason = "Fast action rounds"
+            elif "Bullet Hell" in game_tags:
+                session_reason = "Intense short bursts"
+            else:
+                session_reason = "Quick sessions"
+
             results.append(
-                f"- {game.name}\n"
-                f"  Genre: {', '.join([g.genre_name for g in game.genres[:2]])}\n"
-                f"  {playtime_info}"
+                f"• **{game.name}**{activity_indicator}\n"
+                f"  {session_reason} | {playtime_info}\n"
+                f"  Tags: {', '.join(game_tags[:3])}"
             )
 
         return "\n".join(results)
