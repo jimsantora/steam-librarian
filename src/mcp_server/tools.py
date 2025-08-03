@@ -82,7 +82,7 @@ async def search_games(
     user_steam_id = user_result["steam_id"]
 
     # Check if natural language query needs AI interpretation
-    if ctx and is_natural_language_query(query):
+    if ctx and hasattr(ctx, 'session') and ctx.session and is_natural_language_query(query):
         try:
             interpretation = await ctx.session.create_message(
                 messages=[SamplingMessage(
@@ -182,26 +182,255 @@ async def search_games(
 
 
 @mcp.tool()
-async def generate_recommendation(genre: str, ctx: Context) -> str:
-    """Generate game recommendation using LLM sampling."""
-    prompt = f"Recommend a {genre} game from Steam with a brief description"
+async def generate_recommendation(query: str, ctx: Context, user: str | None = None) -> str:
+    """Intelligent game recommendation using natural language query interpretation.
+    
+    Examples: 'something relaxing after work', 'games like Stardew Valley', 
+    'unplayed indie gems', 'coop games for tonight', 'VR games I haven't tried'
+    """
+    # Validate that we have a proper context and session for LLM interpretation
+    if not ctx or not hasattr(ctx, 'session') or not ctx.session:
+        # Fallback to basic search
+        return await search_games(query, ctx, user)
+    
+    # Use LLM to analyze and categorize the request
+    analysis_prompt = f"""Analyze this gaming request and extract the user's intent:
+
+User query: "{query}"
+
+Determine and return ONLY a JSON object with these fields:
+{{
+    "intent": "one of: unplayed_gems, quick_session, genre_search, platform_specific, multiplayer, family_friendly, similar_to_game, general_search",
+    "genre": "specific genre if mentioned (Action, Adventure, RPG, Strategy, Casual, Indie, etc.) or null",
+    "session_length": "short, medium, long, or null",
+    "platform": "windows, mac, linux, vr, or null", 
+    "multiplayer_type": "coop, pvp, local, online, or null",
+    "game_reference": "name of specific game mentioned or null",
+    "search_terms": "key terms for fallback search"
+}}"""
 
     try:
         result = await ctx.session.create_message(
             messages=[
                 SamplingMessage(
                     role="user",
-                    content=TextContent(type="text", text=prompt)
+                    content=TextContent(type="text", text=analysis_prompt)
                 )
             ],
-            max_tokens=100
+            max_tokens=150
         )
 
-        if result.content.type == "text":
-            return result.content.text
-        return str(result.content)
+        if result.content.type != "text":
+            return await search_games(query, ctx, user)
+
+        # Parse LLM response as JSON
+        import json
+        try:
+            analysis = json.loads(result.content.text.strip())
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            return await search_games(query, ctx, user)
+
+        # Route to appropriate tool/resource based on intent
+        intent = analysis.get("intent", "general_search")
+        
+        if intent == "unplayed_gems":
+            # Use unplayed gems with optional genre filtering
+            unplayed_result = await find_unplayed_gems_with_genre(analysis.get("genre"), user)
+            return f"**Unplayed gems recommendation based on '{query}':**\n\n{unplayed_result}"
+            
+        elif intent == "quick_session":
+            session_length = analysis.get("session_length", "short")
+            quick_result = await find_quick_session_games(session_length, user)
+            return f"**Quick session games for '{query}':**\n\n{quick_result}"
+            
+        elif intent == "platform_specific":
+            platform = analysis.get("platform")
+            if platform:
+                platform_result = await find_platform_games_with_context(platform, analysis.get("genre"), user)
+                return f"**{platform.capitalize()} games for '{query}':**\n\n{platform_result}"
+                
+        elif intent == "multiplayer":
+            mp_type = analysis.get("multiplayer_type", "coop")
+            mp_result = await find_multiplayer_games_with_context(mp_type, analysis.get("genre"), user)
+            return f"**{mp_type.capitalize()} games for '{query}':**\n\n{mp_result}"
+            
+        elif intent == "family_friendly":
+            # Default to age 8 for family games
+            family_result = await find_family_games(8, ctx, user)
+            return f"**Family-friendly games for '{query}':**\n\n{family_result}"
+            
+        elif intent == "similar_to_game":
+            game_ref = analysis.get("game_reference")
+            if game_ref:
+                similar_result = await search_games(f"games like {game_ref}", ctx, user)
+                return f"**Games similar to {game_ref} (based on '{query}'):**\n\n{similar_result}"
+                
+        # Default to enhanced search for genre_search and general_search
+        search_terms = analysis.get("search_terms", query)
+        if analysis.get("genre"):
+            search_terms = f"{analysis['genre']} {search_terms}"
+            
+        search_result = await search_games(search_terms, ctx, user)
+        return f"**Personalized recommendation for '{query}':**\n\n{search_result}"
+
     except Exception as e:
-        return f"Failed to generate recommendation: {str(e)}"
+        # Fallback to basic search if anything fails
+        return await search_games(query, ctx, user)
+
+
+# Helper functions for generate_recommendation routing
+async def find_unplayed_gems_with_genre(genre: str | None = None, user: str | None = None) -> str:
+    """Find unplayed gems, optionally filtered by genre."""
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+
+    with get_db() as session:
+        # Find unplayed games with high ratings
+        unplayed_query = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).filter(
+            UserGame.playtime_forever == 0,  # Never played
+            Game.metacritic_score >= 75
+        )
+        
+        # Add genre filter if specified
+        if genre:
+            unplayed_query = unplayed_query.join(Game.genres).filter(
+                Genre.genre_name.ilike(f"%{genre}%")
+            )
+            
+        unplayed_games = unplayed_query.order_by(
+            Game.metacritic_score.desc()
+        ).limit(5).all()
+
+        if not unplayed_games:
+            genre_text = f" in {genre}" if genre else ""
+            return f"No unplayed games found{genre_text} with Metacritic score >= 75"
+
+        results = []
+        for game, user_game in unplayed_games:
+            genre_names = [g.genre_name for g in game.genres[:2]]
+            results.append(
+                f"• **{game.name}** ({game.metacritic_score}/100)\n"
+                f"  Genres: {', '.join(genre_names)}\n"
+                f"  {game.short_description[:100]}..." if game.short_description else ""
+            )
+
+        return "\n\n".join(results)
+
+async def find_platform_games_with_context(platform: str, genre: str | None = None, user: str | None = None) -> str:
+    """Find platform games with optional genre context."""
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+    
+    platform_field_map = {
+        "windows": "platforms_windows",
+        "mac": "platforms_mac", 
+        "linux": "platforms_linux",
+        "vr": "vr_support"
+    }
+    
+    if platform not in platform_field_map:
+        return f"Invalid platform '{platform}'"
+        
+    with get_db() as session:
+        platform_field = platform_field_map[platform]
+        
+        games_query = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).filter(
+            getattr(Game, platform_field) == True
+        )
+        
+        # Add genre filter if specified
+        if genre:
+            games_query = games_query.join(Game.genres).filter(
+                Genre.genre_name.ilike(f"%{genre}%")
+            )
+            
+        games = games_query.order_by(
+            UserGame.playtime_forever.desc()
+        ).limit(5).all()
+
+        if not games:
+            genre_text = f" {genre}" if genre else ""
+            return f"No{genre_text} games found compatible with {platform}"
+
+        results = []
+        for game, user_game in games:
+            controller_info = f" [{game.controller_support}]" if game.controller_support else ""
+            results.append(
+                f"• **{game.name}**{controller_info}\n"
+                f"  Playtime: {user_game.playtime_forever / 60:.1f} hours"
+            )
+
+        return "\n\n".join(results)
+
+async def find_multiplayer_games_with_context(mp_type: str, genre: str | None = None, user: str | None = None) -> str:
+    """Find multiplayer games with optional genre context."""
+    user_result = resolve_user_for_tool(user, get_default_user_fallback)
+    if "error" in user_result:
+        return f"User error: {user_result['message']}"
+
+    user_steam_id = user_result["steam_id"]
+    
+    type_to_categories = {
+        "coop": ["Co-op", "Online Co-op"],
+        "pvp": ["PvP", "Online PvP"],
+        "local": ["Shared/Split Screen", "Local Co-op"],
+        "online": ["Multi-player", "Online Multi-Player", "Online Co-op", "Online PvP"]
+    }
+
+    if mp_type not in type_to_categories:
+        return f"Invalid multiplayer type '{mp_type}'"
+        
+    target_categories = type_to_categories[mp_type]
+
+    with get_db() as session:
+        games_query = session.query(Game, UserGame).join(
+            UserGame,
+            (Game.app_id == UserGame.app_id) &
+            (UserGame.steam_id == user_steam_id)
+        ).join(Game.categories).filter(
+            Category.category_name.in_(target_categories)
+        )
+        
+        # Add genre filter if specified
+        if genre:
+            games_query = games_query.join(Game.genres).filter(
+                Genre.genre_name.ilike(f"%{genre}%")
+            )
+            
+        games = games_query.distinct().limit(5).all()
+
+        if not games:
+            genre_text = f" {genre}" if genre else ""
+            return f"No{genre_text} {mp_type} games found in your library"
+
+        results = []
+        for game, user_game in games:
+            mp_categories = [c.category_name for c in game.categories
+                           if "player" in c.category_name.lower() or
+                              "co-op" in c.category_name.lower() or
+                              "pvp" in c.category_name.lower()]
+            results.append(
+                f"• **{game.name}**\n"
+                f"  Modes: {', '.join(mp_categories[:3])}\n"
+                f"  Playtime: {user_game.playtime_forever / 60:.1f} hours"
+            )
+
+        return "\n\n".join(results)
 
 
 class GamePreferences(BaseModel):
@@ -222,6 +451,10 @@ async def find_games_with_preferences(initial_genre: str, ctx: Context, user: st
     user_steam_id = user_result["steam_id"]
 
     try:
+        # Check if elicitation is available
+        if not ctx or not hasattr(ctx, 'elicit'):
+            return f"Interactive preferences not available. Try using search_games with '{initial_genre}' instead."
+            
         # Ask for user preferences
         result = await ctx.elicit(
             message=f"Looking for {initial_genre} games. What are your preferences?",
@@ -357,7 +590,7 @@ async def analyze_library(
 - Linux: {platform_stats.linux} games"""
 
         # Optional AI insights
-        if ctx:
+        if ctx and hasattr(ctx, 'session') and ctx.session:
             try:
                 insights_prompt = f"""Based on this gaming library analysis:
                 {analysis}
