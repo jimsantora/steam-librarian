@@ -7,14 +7,11 @@ The Steam Librarian MCP (Model Context Protocol) Server provides AI-powered acce
 ## Features
 
 ### 🛠️ MCP Tools
-Intelligent tools for advanced analysis and AI-powered recommendations:
+Three powerful AI-enhanced tools that showcase advanced MCP capabilities:
 
-- **`search_games`** - Natural language game search with smart mappings and AI interpretation
-- **`analyze_library`** - Comprehensive library statistics with AI-generated insights  
-- **`find_family_games`** - Age-appropriate games with ESRB/PEGI filtering and elicitation
-- **`find_quick_session_games`** - Smart tag-based analysis for quick gaming sessions (5-60 minutes)
-- **`generate_recommendation`** - LLM-powered game recommendations
-- **`find_games_with_preferences`** - Interactive preference-based discovery with elicitation
+- **`smart_search`** - AI-powered unified search with natural language interpretation and intelligent filtering
+- **`recommend_games`** - Context-aware recommendations with interactive elicitation for parameter gathering
+- **`get_library_insights`** - Deep analytics with AI interpretation of gaming patterns and comprehensive insights
 
 ### 📊 MCP Resources
 Structured data access for library exploration and simple filtering:
@@ -42,13 +39,18 @@ Structured data access for library exploration and simple filtering:
 - **`library://tags/{tag_name}`** - Games by community tag
 
 ### 💬 MCP Prompts
-Pre-built conversation starters:
+User-initiated conversation templates with embedded resources:
 
-- **Gaming Session Planner** - Get personalized game recommendations
-- **Library Analysis** - Analyze gaming habits and preferences
-- **Game Discovery** - Find new games based on mood and time
-- **Multiplayer Game Finder** - Find games to play with friends
-- **Game Completion Helper** - Get help completing specific games
+- **Find Family-Friendly Games** - Age-appropriate recommendations with customizable parameters
+- **Quick Gaming Session** - Time-based game suggestions for short play sessions
+- **Discover Unplayed Games** - Find unplayed gems with embedded resource data
+- **Games Similar To Favorite** - Recommendations based on games you love
+- **Natural Language Game Search** - AI-powered search using natural descriptions
+- **Analyze Gaming Patterns** - Library insights with embedded overview data
+- **Mood-Based Game Selection** - Emotional state matching for game recommendations
+- **Find Abandoned Games** - Rediscover started but unfinished games
+- **Explore Games by Genre** - Genre-specific exploration with embedded game lists
+- **View User Profile & Stats** - Complete profile display with embedded user data
 
 ## Architecture
 
@@ -65,8 +67,9 @@ src/mcp_server/
 ```
 
 ### Key Design Principles
+- **Advanced MCP Implementation**: Full use of sampling, elicitation, and completions for intelligent interaction
 - **Consolidated Architecture**: All tools, resources, and prompts in single files
-- **Clear Separation**: Tools for intelligent analysis, Resources for data access
+- **Embedded Resources**: Prompts leverage server-side data for rich conversation context
 - **Personal Library Focus**: Default user handling for single-user scenarios  
 - **Rich Game Intelligence**: Uses genres, categories, and user-generated tags
 - **Database-First**: Direct SQLAlchemy ORM queries for performance
@@ -147,30 +150,47 @@ DEFAULT_USER=76561198020403796 docker-compose up mcp-server
 
 ## Tool Examples
 
-### Natural Language Search
+### AI-Powered Smart Search
 ```python
-# Smart query interpretation
-search_games("family games") 
-# → Filters by Genre: "Casual" + Category: "Family Sharing"
+# Natural language interpretation with AI sampling
+smart_search("family games for tonight")
+# → AI interprets query and filters by family-friendly criteria
 
-search_games("something relaxing after work")
-# → Uses AI to interpret and suggest calming games
+smart_search("something relaxing after work", filters='{"sort_by": "random"}')
+# → Uses AI to map "relaxing" to appropriate genres and tags
 
-search_games("coop games")
-# → Filters by Category: "Co-op" or "Multi-player"
+smart_search("quick puzzle games", limit=5)
+# → AI identifies puzzle games suitable for short sessions
 ```
 
-### Intelligent Recommendations
+### Context-Aware Recommendations
 ```python
-# Age-appropriate filtering with elicitation
-find_family_games(child_age=8)
-# → ESRB ≤ E, PEGI ≤ 7, Family Sharing category, optional content preferences
+# Interactive elicitation for family games
+recommend_games("family", '{"age": 8}')
+# → ESRB/PEGI appropriate games, uses elicitation if age not provided
 
-# Quick session gaming
-find_quick_session_games(session_length="short")
-# → Games perfect for 5-15 minute sessions using community tags
-# → Mix of played games (85%) and unplayed gems with good reviews (15%)
-# → Shows 🔥 recently played, ⭐ favorites, 🆕 unplayed gems (75%+ reviews)
+# Mood-based recommendations with AI interpretation
+recommend_games("mood_based", '{"mood": "relaxing"}')
+# → AI maps emotional state to appropriate game characteristics
+
+# Discover unplayed gems
+recommend_games("unplayed_gems")
+# → Analyzes play history to suggest owned but unplayed games
+```
+
+### Deep Library Analytics
+```python
+# AI-powered pattern analysis
+get_library_insights("patterns")
+# → AI interprets gaming habits and generates personality insights
+
+# Value analysis with intelligent observations
+get_library_insights("value")
+# → Calculates cost-per-hour and identifies high-value games
+
+# Social comparison insights
+get_library_insights("social", compare_to="friends")
+# → Analyzes library overlap and compatibility with friends
 ```
 
 ### Resource Access
@@ -202,15 +222,16 @@ curl "http://localhost:8000/mcp" -X POST \
 
 ## Advanced Features
 
-### AI Integration
-- **LLM Sampling**: Generate contextual game recommendations
-- **Natural Language Processing**: Interpret complex gaming requests
-- **Interactive Elicitation**: Collect user preferences for personalized results
+### MCP Protocol Features
+- **AI Sampling**: Natural language queries interpreted by AI into structured database filters
+- **Interactive Elicitation**: Smart parameter gathering for missing or ambiguous user inputs
+- **Database-Driven Completions**: Tab completion for parameters, contexts, and query patterns
+- **Embedded Resources**: Prompts include actual library data for rich conversation context
 
-### Intelligent Completions
-- **Game Name Completions**: Autocomplete with popular Steam games
-- **Genre Suggestions**: Valid genre names for filtering
-- **User Completions**: Available users with persona names
+### AI Integration
+- **Context-Aware Recommendations**: Six specialized contexts (family, quick_session, similar_to, mood_based, unplayed_gems, abandoned)
+- **Natural Language Processing**: Interpret complex gaming requests and emotional states
+- **Pattern Analysis**: AI interpretation of gaming habits, preferences, and trends
 
 ### Error Handling
 - **Graceful Degradation**: Continue operation when data is missing
@@ -256,7 +277,14 @@ make check-full
 
 ## Version History
 
-### Current (v1.1.3+)
+### Current (v1.5.2)
+- **Advanced MCP Implementation**: Full sampling, elicitation, and completions support
+- **AI-Powered Tools**: Three consolidated tools with natural language processing
+- **Embedded Resource Prompts**: User-initiated templates with actual library data
+- **Context-Aware Recommendations**: Six specialized recommendation contexts
+- **Pattern Analysis**: AI interpretation of gaming habits and preferences
+
+### Previous (v1.5.0)
 - **User-Generated Tags**: Community tag extraction and resources
 - **Consolidated Architecture**: Simplified module structure
 - **Enhanced Game Intelligence**: Multi-source classification system
