@@ -17,10 +17,7 @@ from starlette.responses import JSONResponse, PlainTextResponse
 from .config import config
 
 # Configure logging
-logging.basicConfig(
-    level=logging.DEBUG if config.debug else logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.DEBUG if config.debug else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Create the FastMCP server instance for HTTP streaming
@@ -53,23 +50,12 @@ async def health_detailed(request: Request) -> JSONResponse:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1")).fetchone()
 
-        health_info = {
-            "status": "healthy",
-            "server": "steam-librarian-simplified",
-            "default_user": config.default_user,
-            "debug": config.debug,
-            "version": "1.1.2",
-            "database": "connected"
-        }
+        health_info = {"status": "healthy", "server": "steam-librarian-simplified", "default_user": config.default_user, "debug": config.debug, "version": "1.1.2", "database": "connected"}
 
         return JSONResponse(health_info)
     except Exception as e:
         logger.error(f"Detailed health check failed: {e}")
-        error_info = {
-            "status": "unhealthy",
-            "error": str(e),
-            "server": "steam-librarian-simplified"
-        }
+        error_info = {"status": "unhealthy", "error": str(e), "server": "steam-librarian-simplified"}
         return JSONResponse(error_info, status_code=503)
 
 

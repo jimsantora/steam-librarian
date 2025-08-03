@@ -14,12 +14,7 @@ def discover_games(genre: str = "Action", mood: str = "adventurous") -> str:
 @mcp.prompt(title="Quick Recommendation")
 def quick_recommendation() -> list[base.Message]:
     """Get a quick game recommendation conversation."""
-    return [
-        base.UserMessage("I want to play something new but don't know what"),
-        base.AssistantMessage("What genre are you in the mood for? Action, RPG, Strategy, or something else?"),
-        base.UserMessage("I'm feeling like something relaxing"),
-        base.AssistantMessage("For relaxing games, I'd recommend checking out simulation or puzzle games. What's your preference on time commitment?")
-    ]
+    return [base.UserMessage("I want to play something new but don't know what"), base.AssistantMessage("What genre are you in the mood for? Action, RPG, Strategy, or something else?"), base.UserMessage("I'm feeling like something relaxing"), base.AssistantMessage("For relaxing games, I'd recommend checking out simulation or puzzle games. What's your preference on time commitment?")]
 
 
 @mcp.prompt(title="Library Analysis")
@@ -37,12 +32,7 @@ def plan_gaming_session(time_available: str = "2 hours", players: str = "solo") 
 @mcp.prompt(title="Multiplayer Finder")
 def find_multiplayer_games() -> list[base.Message]:
     """Find multiplayer games conversation."""
-    return [
-        base.UserMessage("I want to play games with friends online"),
-        base.AssistantMessage("How many friends will be playing? And what type of multiplayer experience are you looking for - competitive, cooperative, or casual?"),
-        base.UserMessage("3-4 friends, we like cooperative games"),
-        base.AssistantMessage("Great! I'll look for co-op games that support 4 players. Do you prefer action games, strategy games, or are you open to different genres?")
-    ]
+    return [base.UserMessage("I want to play games with friends online"), base.AssistantMessage("How many friends will be playing? And what type of multiplayer experience are you looking for - competitive, cooperative, or casual?"), base.UserMessage("3-4 friends, we like cooperative games"), base.AssistantMessage("Great! I'll look for co-op games that support 4 players. Do you prefer action games, strategy games, or are you open to different genres?")]
 
 
 @mcp.prompt(title="Game Completion Helper")

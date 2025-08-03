@@ -1,26 +1,43 @@
-.PHONY: help build-docker run-docker stop-docker rebuild-mcp-docker helm-install helm-uninstall lint format-check format test test-unit test-integration test-full check check-full clean
+.PHONY: help build-docker run-docker stop-docker rebuild-mcp-docker helm-install helm-uninstall lint format-check format test test-unit test-integration test-full check check-full clean test-mcp-tools test-mcp-resources test-mcp-server test-mcp-protocol test-mcp-new-tools test-mcp-full test-mcp-completions test-mcp-prompts
 
 # Default target
 help:
 	@echo "Steam Librarian - Available targets:"
+	@echo ""
+	@echo "Docker targets:"
 	@echo "  make build-docker    - Build Docker images"
 	@echo "  make run-docker      - Run with Docker Compose"
 	@echo "  make stop-docker     - Stop Docker Compose"
 	@echo "  make rebuild-mcp-docker - Stop, rebuild MCP server without cache, and run"
 	@echo "  make rebuild-all-docker - Stop, rebuild all containers without cache, and run"
+	@echo ""
+	@echo "Kubernetes/Helm targets:"
 	@echo "  make helm-install    - Install with Helm (requires values-override.yaml)"
 	@echo "  make helm-uninstall  - Uninstall Helm release"
 	@echo "  make helm-lint       - Lint Helm chart"
 	@echo "  make helm-validate   - Validate Helm chart with kubeconform"
+	@echo ""
+	@echo "Code quality targets:"
 	@echo "  make lint            - Run ruff linting"
 	@echo "  make format-check    - Check code formatting with black"
 	@echo "  make format          - Format code with black"
+	@echo "  make check           - Run all code quality checks"
+	@echo "  make check-full      - Run all checks + comprehensive tests"
+	@echo ""
+	@echo "Basic test targets:"
 	@echo "  make test            - Run basic import tests"
 	@echo "  make test-unit       - Run comprehensive unit tests"
 	@echo "  make test-integration- Run integration tests (starts server)"
 	@echo "  make test-full       - Run all tests (unit + integration)"
-	@echo "  make check           - Run all code quality checks"
-	@echo "  make check-full      - Run all checks + comprehensive tests"
+	@echo ""
+	@echo "MCP-specific test targets:"
+	@echo "  make test-mcp-tools  - Test comprehensive MCP tools (smart_search, recommend_games, get_library_insights)"
+	@echo "  make test-mcp-resources - Test all MCP resources"
+	@echo "  make test-mcp-protocol - Test MCP protocol compliance"
+	@echo "  make test-mcp-completions - Test MCP completions"
+	@echo "  make test-mcp-prompts - Test MCP prompts"
+	@echo "  make test-mcp-server - Test server functionality"
+	@echo "  make test-mcp-full   - Run complete MCP test suite with report"
 
 # Docker targets
 build-docker:
@@ -115,3 +132,33 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	rm -f steam_library.db
+
+# MCP-specific test targets
+test-mcp-tools:
+	@echo "Testing all MCP tools (now uses comprehensive new tool tests)..."
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_tools.py
+
+test-mcp-resources:
+	@echo "Testing MCP resources..."
+	cd $(shell pwd) && PYTHONPATH=src python -c "from tests.test_mcp_full import test_resources; import sys; result = test_resources(); sys.exit(0 if result.wasSuccessful() else 1)"
+
+test-mcp-protocol:
+	@echo "Testing MCP protocol compliance..."
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_protocol.py
+
+test-mcp-completions:
+	@echo "Testing MCP completions..."
+	cd $(shell pwd) && PYTHONPATH=src python -c "from tests.test_mcp_full import test_completions; import sys; result = test_completions(); sys.exit(0 if result.wasSuccessful() else 1)"
+
+test-mcp-prompts:
+	@echo "Testing MCP prompts..."
+	cd $(shell pwd) && PYTHONPATH=src python -c "from tests.test_mcp_full import test_prompts; import sys; result = test_prompts(); sys.exit(0 if result.wasSuccessful() else 1)"
+
+test-mcp-server:
+	@echo "Testing MCP server functionality..."
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_server.py
+
+test-mcp-full:
+	@echo "Running complete MCP test suite with comprehensive report..."
+	@mkdir -p agent_output
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_full.py

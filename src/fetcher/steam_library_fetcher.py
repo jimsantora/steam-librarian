@@ -189,8 +189,8 @@ class SteamLibraryFetcher:
 
         for match in matches:
             # Clean up the tag text (remove extra whitespace and newlines)
-            tag = re.sub(r'\s+', ' ', match.strip())
-            if tag and tag != '+':  # Skip the '+' button
+            tag = re.sub(r"\s+", " ", match.strip())
+            if tag and tag != "+":  # Skip the '+' button
                 tags.append(tag)
 
         return tags
@@ -514,29 +514,7 @@ class SteamLibraryFetcher:
             # Create or update game
             game = session.query(Game).filter_by(app_id=app_id).first()
             if not game:
-                game = Game(
-                    app_id=app_id,
-                    name=game_data["name"],
-                    required_age=game_data.get("required_age", 0),
-                    short_description=game_data.get("short_description", ""),
-                    detailed_description=game_data.get("detailed_description", ""),
-                    about_the_game=game_data.get("about_the_game", ""),
-                    recommendations_total=game_data.get("recommendations_total", 0),
-                    metacritic_score=game_data.get("metacritic_score", 0),
-                    metacritic_url=game_data.get("metacritic_url", ""),
-                    header_image=game_data.get("header_image", ""),
-                    platforms_windows=game_data.get("platforms_windows", False),
-                    platforms_mac=game_data.get("platforms_mac", False),
-                    platforms_linux=game_data.get("platforms_linux", False),
-                    controller_support=game_data.get("controller_support", ""),
-                    vr_support=game_data.get("vr_support", False),
-                    esrb_rating=game_data.get("esrb_rating", ""),
-                    esrb_descriptors=game_data.get("esrb_descriptors", ""),
-                    pegi_rating=game_data.get("pegi_rating", ""),
-                    pegi_descriptors=game_data.get("pegi_descriptors", ""),
-                    release_date=game_data.get("release_date", ""),
-                    last_updated=int(datetime.now().timestamp()) if not skip_details else None
-                )
+                game = Game(app_id=app_id, name=game_data["name"], required_age=game_data.get("required_age", 0), short_description=game_data.get("short_description", ""), detailed_description=game_data.get("detailed_description", ""), about_the_game=game_data.get("about_the_game", ""), recommendations_total=game_data.get("recommendations_total", 0), metacritic_score=game_data.get("metacritic_score", 0), metacritic_url=game_data.get("metacritic_url", ""), header_image=game_data.get("header_image", ""), platforms_windows=game_data.get("platforms_windows", False), platforms_mac=game_data.get("platforms_mac", False), platforms_linux=game_data.get("platforms_linux", False), controller_support=game_data.get("controller_support", ""), vr_support=game_data.get("vr_support", False), esrb_rating=game_data.get("esrb_rating", ""), esrb_descriptors=game_data.get("esrb_descriptors", ""), pegi_rating=game_data.get("pegi_rating", ""), pegi_descriptors=game_data.get("pegi_descriptors", ""), release_date=game_data.get("release_date", ""), last_updated=int(datetime.now().timestamp()) if not skip_details else None)
                 session.add(game)
                 session.flush()
             elif not skip_details:
