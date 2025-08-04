@@ -3,4 +3,4 @@
 # Import all modules to register MCP decorators
 from . import completions, prompts, resources, tools
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
