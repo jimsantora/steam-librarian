@@ -6,12 +6,13 @@ import sys
 import unittest
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mcp.types import TextResourceContents
+
 
 # Directly implement the helper functions for testing to avoid database dependencies
 def create_resource_content(
@@ -19,15 +20,15 @@ def create_resource_content(
     name: str,
     title: str,
     description: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     priority: float = 0.5,
-    audience: List[str] = None,
+    audience: list[str] = None,
     mime_type: str = "application/json"
 ) -> TextResourceContents:
     """Create properly formatted resource content with metadata and annotations."""
     if audience is None:
         audience = ["user", "assistant"]
-    
+
     # Annotations go in the meta field for MCP
     meta = {
         "audience": audience,
@@ -37,7 +38,7 @@ def create_resource_content(
         "title": title,
         "description": description
     }
-    
+
     return TextResourceContents(
         uri=uri,
         mimeType=mime_type,
@@ -72,7 +73,7 @@ class TestEnhancedResources(unittest.TestCase):
             ],
             "total": 2
         }
-        
+
         # Create resource content
         content = create_resource_content(
             uri="library://test/games",
@@ -83,15 +84,15 @@ class TestEnhancedResources(unittest.TestCase):
             priority=0.8,
             audience=["user", "assistant"]
         )
-        
+
         # Verify it's the correct type
         self.assertIsInstance(content, TextResourceContents)
-        
+
         # Verify required fields
         self.assertEqual(str(content.uri), "library://test/games")
         self.assertEqual(content.mimeType, "application/json")
         self.assertIsNotNone(content.text)
-        
+
         # Verify metadata structure
         self.assertIsNotNone(content.meta)
         self.assertEqual(content.meta["name"], "test_games")
@@ -100,7 +101,7 @@ class TestEnhancedResources(unittest.TestCase):
         self.assertEqual(content.meta["audience"], ["user", "assistant"])
         self.assertEqual(content.meta["priority"], 0.8)
         self.assertIn("lastModified", content.meta)
-        
+
         # Verify JSON content can be parsed back
         parsed_data = json.loads(content.text)
         self.assertEqual(parsed_data, test_data)
@@ -112,17 +113,17 @@ class TestEnhancedResources(unittest.TestCase):
             name="test_error",
             error_message="Resource not found"
         )
-        
+
         # Verify it's the correct type
         self.assertIsInstance(error_content, TextResourceContents)
-        
+
         # Verify error structure
         self.assertEqual(str(error_content.uri), "library://test/nonexistent")
         self.assertEqual(error_content.meta["name"], "test_error")
         self.assertEqual(error_content.meta["title"], "Resource Error")
         self.assertEqual(error_content.meta["priority"], 0.1)  # Low priority for errors
         self.assertEqual(error_content.meta["audience"], ["assistant"])  # Errors are for assistant
-        
+
         # Verify error message in content
         parsed_data = json.loads(error_content.text)
         self.assertIn("error", parsed_data)
@@ -137,18 +138,18 @@ class TestEnhancedResources(unittest.TestCase):
             description="Testing MCP specification compliance",
             data={"test": True}
         )
-        
+
         # Verify MCP annotations compliance
         self.assertIsInstance(content.meta["audience"], list)
         valid_audiences = {"user", "assistant"}
         for aud in content.meta["audience"]:
             self.assertIn(aud, valid_audiences, f"Invalid audience value: {aud}")
-        
+
         # Verify priority is a number between 0.0 and 1.0
         self.assertIsInstance(content.meta["priority"], (int, float))
         self.assertGreaterEqual(content.meta["priority"], 0.0)
         self.assertLessEqual(content.meta["priority"], 1.0)
-        
+
         # Verify lastModified is ISO 8601 format
         last_modified = content.meta["lastModified"]
         try:
@@ -166,7 +167,7 @@ class TestEnhancedResources(unittest.TestCase):
             description="Testing default parameters",
             data={"defaults": True}
         )
-        
+
         # Verify defaults
         self.assertEqual(content.meta["priority"], 0.5)  # Default priority
         self.assertEqual(content.meta["audience"], ["user", "assistant"])  # Default audience
@@ -182,7 +183,7 @@ class TestEnhancedResources(unittest.TestCase):
             data={"custom": True},
             mime_type="application/vnd.steam-librarian+json"
         )
-        
+
         self.assertEqual(content.mimeType, "application/vnd.steam-librarian+json")
 
     def test_metadata_structure_consistency(self):
@@ -193,7 +194,7 @@ class TestEnhancedResources(unittest.TestCase):
             ("library://users/456", "user_456", "User Profile", "User profile information"),
             ("library://genres/Action", "action_games", "Action Games", "Games in Action genre")
         ]
-        
+
         for uri, name, title, description in test_cases:
             with self.subTest(uri=uri):
                 content = create_resource_content(
@@ -203,11 +204,11 @@ class TestEnhancedResources(unittest.TestCase):
                     description=description,
                     data={"test": uri}
                 )
-                
+
                 # Verify consistent metadata structure
                 required_meta_keys = {"audience", "priority", "lastModified", "name", "title", "description"}
                 self.assertEqual(set(content.meta.keys()), required_meta_keys)
-                
+
                 # Verify all values are non-None and correct types
                 self.assertIsInstance(content.meta["audience"], list)
                 self.assertIsInstance(content.meta["priority"], (int, float))

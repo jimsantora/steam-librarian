@@ -3,9 +3,9 @@
 
 import asyncio
 import os
+import signal
 import subprocess
 import sys
-import signal
 from pathlib import Path
 
 try:
@@ -17,33 +17,33 @@ except ImportError:
 
 class ServerHealthTests:
     """Simple server health and startup testing"""
-    
+
     def __init__(self, port=8001):
         self.server_process = None
         self.base_url = f"http://localhost:{port}"
         self.port = port
-        
+
     async def start_test_server(self):
         """Start the MCP server for testing"""
         print("🚀 Starting test server...")
-        
+
         if not HAS_AIOHTTP:
             print("⚠️  aiohttp not available - skipping server startup test")
             return False
-        
+
         # Start server process
         cmd = [
-            sys.executable, 
+            sys.executable,
             str(Path(__file__).parent.parent / "src" / "mcp_server" / "run_server.py")
         ]
-        
+
         env = {
             **dict(os.environ),
             "MCP_HOST": "127.0.0.1",
             "MCP_PORT": str(self.port),
             "DEBUG": "false"  # Reduce noise during tests
         }
-        
+
         try:
             self.server_process = subprocess.Popen(
                 cmd,
@@ -52,7 +52,7 @@ class ServerHealthTests:
                 stderr=subprocess.PIPE,
                 preexec_fn=os.setsid if hasattr(os, 'setsid') else None
             )
-            
+
             # Wait for server to start
             for i in range(20):  # 20 second timeout
                 try:
@@ -64,14 +64,14 @@ class ServerHealthTests:
                 except:
                     pass
                 await asyncio.sleep(1)
-            
+
             print("❌ Test server failed to start within timeout")
             return False
-            
+
         except Exception as e:
             print(f"❌ Failed to start test server: {e}")
             return False
-    
+
     def stop_test_server(self):
         """Stop the test server"""
         if self.server_process:
@@ -81,7 +81,7 @@ class ServerHealthTests:
                     os.killpg(os.getpgid(self.server_process.pid), signal.SIGTERM)
                 else:
                     self.server_process.terminate()
-                
+
                 # Wait for process to end
                 try:
                     self.server_process.wait(timeout=5)
@@ -90,19 +90,19 @@ class ServerHealthTests:
                         os.killpg(os.getpgid(self.server_process.pid), signal.SIGKILL)
                     else:
                         self.server_process.kill()
-                
+
                 print("✅ Test server stopped")
             except Exception as e:
                 print(f"⚠️  Error stopping test server: {e}")
-    
+
     async def test_health_endpoints(self):
         """Test health check endpoints"""
         print("🏥 Testing Health Endpoints...")
-        
+
         if not HAS_AIOHTTP:
             print("⚠️  Skipping health endpoint tests - aiohttp not available")
             return False
-        
+
         async with aiohttp.ClientSession() as session:
             # Test basic health check
             try:
@@ -114,7 +114,7 @@ class ServerHealthTests:
             except Exception as e:
                 print(f"❌ Basic health check failed: {e}")
                 return False
-            
+
             # Test detailed health check
             try:
                 async with session.get(f"{self.base_url}/health/detailed") as response:
@@ -125,17 +125,17 @@ class ServerHealthTests:
             except Exception as e:
                 print(f"❌ Detailed health check failed: {e}")
                 return False
-        
+
         return True
-    
+
     async def test_mcp_endpoint_accessibility(self):
         """Test that MCP endpoint is accessible"""
         print("🔌 Testing MCP Endpoint...")
-        
+
         if not HAS_AIOHTTP:
             print("⚠️  Skipping MCP endpoint test - aiohttp not available")
             return False
-        
+
         async with aiohttp.ClientSession() as session:
             try:
                 # Test that MCP endpoint exists and responds
@@ -159,35 +159,35 @@ class ServerHealthTests:
             except Exception as e:
                 print(f"❌ MCP endpoint test failed: {e}")
                 return False
-    
+
     async def run_all_tests(self):
         """Run all server health tests"""
         print("🔗 Steam Librarian MCP Server Health Tests")
         print("=" * 50)
-        
+
         if not HAS_AIOHTTP:
             print("⚠️  aiohttp not available - most tests will be skipped")
             print("   Install with: pip install aiohttp")
             return False
-        
+
         try:
             # Start test server
             if not await self.start_test_server():
                 return False
-            
+
             # Run health tests
             health_ok = await self.test_health_endpoints()
             mcp_ok = await self.test_mcp_endpoint_accessibility()
-            
+
             success = health_ok and mcp_ok
-            
+
             if success:
                 print("\n✅ All server health tests passed!")
             else:
                 print("\n❌ Some server health tests failed")
-            
+
             return success
-            
+
         finally:
             # Always stop the server
             self.stop_test_server()
