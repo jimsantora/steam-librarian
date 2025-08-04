@@ -38,6 +38,12 @@ help:
 	@echo "  make test-mcp-prompts - Test MCP prompts"
 	@echo "  make test-mcp-server - Test server functionality"
 	@echo "  make test-mcp-full   - Run complete MCP test suite with report"
+	@echo ""
+	@echo "Tools-only MCP server targets:"
+	@echo "  make run-tools       - Run tools-only MCP server (port 8001)"
+	@echo "  make dev-tools       - Run tools-only server in debug mode"
+	@echo "  make test-tools      - Test tools-only server"
+	@echo "  make health-tools    - Check tools-only server health"
 
 # Docker targets
 build-docker:
@@ -171,3 +177,20 @@ test-mcp-full:
 	@echo "Running complete MCP test suite with comprehensive report..."
 	@mkdir -p agent_output
 	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_full.py
+
+# Tools-only MCP server targets
+run-tools:
+	@echo "Starting tools-only MCP server on port 8001..."
+	cd $(shell pwd) && PYTHONPATH=src python src/oops_all_tools/run_server.py
+
+dev-tools:
+	@echo "Starting tools-only MCP server in debug mode..."
+	cd $(shell pwd) && PYTHONPATH=src DEBUG=true python src/oops_all_tools/run_server.py
+
+test-tools:
+	@echo "Testing tools-only MCP server..."
+	cd $(shell pwd) && PYTHONPATH=src python tests/test_oops_all_tools.py
+
+health-tools:
+	@echo "Checking tools-only server health..."
+	@curl -f http://localhost:8001/health || echo "Server not responding on port 8001"
