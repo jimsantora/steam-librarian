@@ -111,14 +111,20 @@ test:
 	python -c "from src.shared.database import Base, get_db; from src.fetcher.steam_library_fetcher import SteamLibraryFetcher; from src.mcp_server.server import mcp; print('✅ All basic imports successful!')"
 
 test-unit:
-	@echo "Running comprehensive unit tests..."
-	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_server.py
+	@echo "Running unit tests for MCP compliance..."
+	python tests/test_enhanced_tools.py
+	python tests/test_enhanced_prompts.py
+	python tests/test_enhanced_resources.py
 
 test-integration:
-	@echo "Running integration tests (this will start a test server)..."
-	cd $(shell pwd) && PYTHONPATH=src python tests/test_integration.py
+	@echo "Running server health and startup tests..."
+	python tests/test_server_health.py
 
-test-full: test-unit test-integration
+test-functional:
+	@echo "Running functional tests for tools..."
+	python tests/test_tools_simple.py
+
+test-full: test-unit test-functional test-integration
 	@echo "All tests completed!"
 
 check: lint format-check test
@@ -135,12 +141,13 @@ clean:
 
 # MCP-specific test targets
 test-mcp-tools:
-	@echo "Testing all MCP tools (now uses comprehensive new tool tests)..."
-	cd $(shell pwd) && PYTHONPATH=src python tests/test_mcp_tools.py
+	@echo "Testing MCP tools compliance and functionality..."
+	python tests/test_enhanced_tools.py
+	python tests/test_tools_simple.py
 
 test-mcp-resources:
 	@echo "Testing MCP resources..."
-	cd $(shell pwd) && PYTHONPATH=src python -c "from tests.test_mcp_full import test_resources; import sys; result = test_resources(); sys.exit(0 if result.wasSuccessful() else 1)"
+	python tests/test_enhanced_resources.py
 
 test-mcp-protocol:
 	@echo "Testing MCP protocol compliance..."
