@@ -57,6 +57,54 @@ def is_natural_language_query(query: str) -> bool:
     return any(indicator in query_lower for indicator in nl_indicators)
 
 
+def parse_natural_language_filters(text: str) -> dict:
+    """Parse natural language filters into structured format."""
+    import re
+    filters = {}
+
+    # Genre detection
+    genres = ["Action", "Adventure", "RPG", "Strategy", "Indie", "Casual",
+              "Simulation", "Sports", "Racing", "Puzzle"]
+    for genre in genres:
+        if genre.lower() in text.lower():
+            filters["genres"] = [genre]
+            break
+
+    # Rating detection - multiple patterns
+    rating_patterns = [
+        r'rating\s*(?:above|over|>=?)\s*(\d+)',  # "rating above 75"
+        r'rated\s*(?:above|over|>=?)\s*(\d+)',   # "rated over 80"
+        r'(?:rating|rated)\s*>=?\s*(\d+)',       # "rating >= 90"
+        r'(?:min|minimum)\s*rating\s*(\d+)',     # "minimum rating 75"
+    ]
+
+    for pattern in rating_patterns:
+        rating_match = re.search(pattern, text, re.I)
+        if rating_match:
+            filters["min_rating"] = int(rating_match.group(1))
+            break
+
+    # Multiplayer detection
+    if any(word in text.lower() for word in ["coop", "co-op", "cooperative"]):
+        filters["categories"] = ["Co-op"]
+    elif "pvp" in text.lower():
+        filters["categories"] = ["PvP"]
+    elif "multiplayer" in text.lower():
+        filters["categories"] = ["Multi-player"]
+
+    # Platform detection
+    if "vr" in text.lower():
+        filters["vr_support"] = True
+
+    # Playtime detection
+    if any(word in text.lower() for word in ["unplayed", "never played"]):
+        filters["playtime"] = "unplayed"
+    elif any(word in text.lower() for word in ["played", "started"]):
+        filters["playtime"] = "played"
+
+    return filters
+
+
 @mcp.tool(name="smart_search", title="AI-Powered Game Search", description="Unified smart search across all game classification layers with natural language interpretation and AI-powered filtering", annotations=ToolAnnotations(title="Advanced Game Discovery", readOnlyHint=True, idempotentHint=True))
 async def smart_search(query: str, filters: str = "", sort_by: str = "relevance", limit: int = 10, ctx: Context | None = None, user: str | None = None) -> CallToolResult:
     """
@@ -84,13 +132,51 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
 
     user_steam_id = user_result["steam_id"]
 
-    # Parse filters parameter
+    # Parse filters parameter with natural language support
     filter_dict = {}
     if filters and filters.strip():
+        # Try JSON parsing first
         try:
             filter_dict = json.loads(filters)
         except json.JSONDecodeError:
-            return CallToolResult(content=[TextContent(type="text", text="Invalid filters format. Please provide valid JSON.", annotations=Annotations(audience=["assistant"], priority=0.8))], isError=True)
+            # Fallback to natural language parsing
+            filter_dict = parse_natural_language_filters(filters)
+
+            # Validate filter structure
+            valid_filters = ["genres", "categories", "tags", "min_rating", "max_rating",
+                           "playtime", "vr_support", "platform"]
+
+            invalid_keys = [k for k in filter_dict.keys() if k not in valid_filters]
+            if invalid_keys:
+                example_json = {
+                    "genres": ["Action"],
+                    "min_rating": 75,
+                    "categories": ["Co-op"]
+                }
+                error_msg = f'''Filter error: Unknown filter keys: {invalid_keys}
+
+Valid filters: {', '.join(valid_filters)}
+
+Example JSON filter:
+{json.dumps(example_json, indent=2)}
+
+Example text filter:
+"action games with rating above 75 and coop multiplayer"
+
+Natural language examples:
+- "puzzle games"
+- "multiplayer action games rated over 80"
+- "unplayed indie games"
+- "vr games"'''
+
+                return CallToolResult(
+                    content=[TextContent(
+                        type="text",
+                        text=error_msg,
+                        annotations=Annotations(audience=["user"], priority=0.9)
+                    )],
+                    isError=True
+                )
 
     # Use Sampling for natural language queries
     if ctx and hasattr(ctx, "session") and ctx.session and is_natural_language_query(query):
@@ -166,6 +252,16 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
         elif filter_dict.get("playtime") == "unplayed":
             games_query = games_query.filter(UserGame.playtime_forever == 0)
 
+        # Additional filters
+        if filter_dict.get("min_rating"):
+            games_query = games_query.filter(Game.metacritic_score >= filter_dict["min_rating"])
+
+        if filter_dict.get("max_rating"):
+            games_query = games_query.filter(Game.metacritic_score <= filter_dict["max_rating"])
+
+        if filter_dict.get("vr_support"):
+            games_query = games_query.filter(Game.vr_support)
+
         # Text search if no specific filters applied or for general queries
         if not any(filter_dict.get(k) for k in ["genres", "categories", "tags"]) or query.lower() not in ["unplayed gems", "family games", "multiplayer", "coop"]:
             # Add text search
@@ -191,12 +287,25 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
 
         if not results:
             no_results_msg = f"No games found matching '{query}'" + (f" with filters: {filter_dict}" if filter_dict else "")
-            return CallToolResult(content=[TextContent(type="text", text=no_results_msg, annotations=Annotations(audience=["assistant"], priority=0.7))], structuredContent={"results": [], "query": query, "filters": filter_dict, "total": 0}, isError=False)
+            suggestions = "\n\nTry:\n- Broadening your search terms\n- Using different genres or tags\n- Checking for typos\n- Using 'get_tool_help(\"smart_search\")' for examples"
+            return CallToolResult(content=[TextContent(type="text", text=no_results_msg + suggestions, annotations=Annotations(audience=["user"], priority=0.7))], structuredContent={"results": [], "query": query, "filters": filter_dict, "total": 0}, isError=False)
 
         # Format enhanced results for display
         output = [f"**Smart search results for '{query}':**"]
         if filter_dict:
-            output.append(f"Applied filters: {filter_dict}")
+            # Format filters in a user-friendly way
+            filter_desc = []
+            if filter_dict.get("genres"):
+                filter_desc.append(f"Genres: {', '.join(filter_dict['genres'])}")
+            if filter_dict.get("categories"):
+                filter_desc.append(f"Categories: {', '.join(filter_dict['categories'])}")
+            if filter_dict.get("min_rating"):
+                filter_desc.append(f"Min Rating: {filter_dict['min_rating']}")
+            if filter_dict.get("playtime"):
+                filter_desc.append(f"Playtime: {filter_dict['playtime']}")
+
+            if filter_desc:
+                output.append(f"Filters applied: {' | '.join(filter_desc)}")
         output.append("")
 
         for game in results:
@@ -227,8 +336,64 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
 
             output.append(f"• **{game['name']}**{metacritic_str}{activity}\n" f"  Genres: {genres_str} | Platforms: {platform_str}\n" f"  Playtime: {game['playtime']:.1f}h" + (f" (recent: {game['recent_playtime']:.1f}h)" if game["recent_playtime"] > 0 else "") + (f"\n  Tags: {tags_str}" if tags_str else ""))
 
+        # Add helpful footer
+        output.append("\n💡 **Tip:** Use 'get_tool_help(\"smart_search\")' for more filter examples and search tips.")
+
         # Return structured content with both text display and structured data
         return CallToolResult(content=[TextContent(type="text", text="\n".join(output), annotations=Annotations(audience=["user", "assistant"], priority=0.9))], structuredContent={"results": results, "query": query, "filters": filter_dict, "sort_by": sort_by, "total": len(results), "limited": len(results) == limit}, isError=False)
+
+
+def parse_recommendation_parameters(text: str) -> dict:
+    """Parse natural language recommendation parameters."""
+    import re
+    params = {}
+
+    # Exclusion patterns
+    exclude_patterns = [
+        (r'(?:no|exclude|without|not|avoid)\s+(\w+)', 'exclude_genres'),
+        (r'(?:no|exclude|without)\s+multiplayer', 'exclude_multiplayer'),
+    ]
+
+    for pattern, param_key in exclude_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            if param_key == 'exclude_genres':
+                # Map common terms to genres
+                genre_map = {
+                    'horror': 'Horror',
+                    'scary': 'Horror',
+                    'action': 'Action',
+                    'puzzle': 'Puzzle',
+                    'strategy': 'Strategy'
+                }
+                term = match.group(1).lower()
+                if term in genre_map:
+                    params['exclude_genres'] = [genre_map[term]]
+            else:
+                params[param_key] = True
+
+    # Rating patterns
+    rating_match = re.search(r'(?:minimum|min|at least)\s+rating\s+(\d+)', text, re.I)
+    if not rating_match:
+        rating_match = re.search(r'(?:highly|well)\s+rated', text, re.I)
+        if rating_match:
+            params['min_rating'] = 75
+    else:
+        params['min_rating'] = int(rating_match.group(1))
+
+    # Time commitment patterns
+    if any(word in text.lower() for word in ['short', 'quick', 'brief']):
+        params['max_hours'] = 20
+    elif any(word in text.lower() for word in ['long', 'epic', 'extensive']):
+        params['min_hours'] = 40
+
+    # Single/multiplayer patterns
+    if 'single player' in text.lower() or 'single-player' in text.lower():
+        params['single_player'] = True
+    elif 'multiplayer' in text.lower() and 'no multiplayer' not in text.lower():
+        params['multiplayer'] = True
+
+    return params
 
 
 @mcp.tool(name="recommend_games", title="Context-Aware Game Recommendations", description="Intelligent game recommendations with interactive elicitation for missing parameters and context-aware filtering", annotations=ToolAnnotations(title="AI-Powered Recommendations", readOnlyHint=True, idempotentHint=False, openWorldHint=True))  # Results may vary based on elicitation  # Context parameter has many possible values
@@ -236,20 +401,34 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
     """
     Intelligent game recommendations with interactive elicitation for enhanced user experience.
 
+    Available contexts:
+    - "abandoned": Games you started but haven't finished (playtime 1-10 hours)
+    - "similar_to:[game]": Games similar to a specific game (e.g., "similar_to:Portal 2")
+    - "mood:[feeling]": Games matching a mood (e.g., "mood:relaxing", "mood:competitive")
+    - "genre:[type]": Games in a specific genre with smart filtering
+    - "trending": Popular games being played by many users recently
+    - "hidden_gems": Highly-rated games with low player counts
+    - "completionist": Games where you're close to 100% achievements
+    - "weekend": Games perfect for weekend sessions (20-40 hour campaigns)
+    - "family": Age-appropriate games (will ask for age)
+    - "quick_session": Games for short sessions (will ask for time available)
+
+    Parameters can be:
+    - JSON object: {"exclude_genres": ["Horror"], "min_rating": 80}
+    - Natural language: "exclude horror games, minimum rating 80"
+    - Simple keywords: "no horror, highly rated"
+
+    Examples:
+    - context="abandoned", parameters="focus on shorter games"
+    - context="mood:relaxing", parameters="no multiplayer"
+    - context="similar_to:Hades", parameters='{"exclude_genres": ["Horror"]}'
+
     Args:
-        context: Recommendation context - family|quick_session|similar_to|mood_based|unplayed_gems|abandoned
-        parameters: JSON string with context-specific parameters (will elicit if missing critical data)
+        context: Recommendation context (see available contexts above)
+        parameters: Additional filtering parameters (JSON, natural language, or keywords)
         use_play_history: Whether to incorporate user's play history in recommendations
         ctx: MCP context for elicitation and AI sampling
         user: Steam user identifier (optional, uses default if not provided)
-
-    Contexts:
-        - family: Age-appropriate games (elicits: age, players, content_concerns)
-        - quick_session: Short gaming sessions (elicits: available_minutes, energy_level)
-        - similar_to: Games similar to specified game (elicits: game_name, similarity_aspects)
-        - mood_based: Based on current mood (elicits: mood, desired_intensity)
-        - unplayed_gems: High-rated games you haven't played
-        - abandoned: Games you started but didn't finish
 
     Returns:
         CallToolResult with personalized recommendations, structured data, and potential resource links
@@ -263,13 +442,35 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
 
     user_steam_id = user_result["steam_id"]
 
-    # Parse parameters
+    # Parse parameters flexibly
     params = {}
     if parameters and parameters.strip():
-        try:
-            params = json.loads(parameters)
-        except json.JSONDecodeError:
-            return CallToolResult(content=[TextContent(type="text", text="Invalid parameters format. Please provide valid JSON.", annotations=Annotations(audience=["assistant"], priority=0.8))], isError=True)
+        if isinstance(parameters, str):
+            # Try JSON first
+            try:
+                params = json.loads(parameters)
+            except json.JSONDecodeError:
+                # Parse as natural language
+                params = parse_recommendation_parameters(parameters)
+        elif isinstance(parameters, dict):
+            params = parameters
+        else:
+            error_msg = f'''Parameter format error. Parameters should be either:
+
+1. JSON string: '{"exclude_genres": ["Horror"], "min_rating": 80}'
+2. Natural language: "exclude horror games, minimum rating 80"
+3. Simple keywords: "no horror, highly rated"
+
+Received type: {type(parameters).__name__}
+Received value: {parameters}'''
+            return CallToolResult(
+                content=[TextContent(
+                    type="text",
+                    text=error_msg,
+                    annotations=Annotations(audience=["user"], priority=0.9)
+                )],
+                isError=True
+            )
 
     # Enhanced elicitation with proper MCP JSON schemas
     if context == "family" and ctx and hasattr(ctx, "elicit"):
@@ -305,6 +506,37 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
     elif context == "abandoned":
         return await recommend_abandoned_games(user_steam_id)
     else:
+        # Validate context format
+        valid_contexts = ["abandoned", "trending", "hidden_gems", "completionist", "weekend", "family", "quick_session"]
+        valid_prefixes = ["similar_to:", "mood:", "genre:"]
+
+        context_valid = context in valid_contexts or any(context.startswith(p) for p in valid_prefixes)
+
+        if not context_valid:
+            error_msg = f'''Invalid context: "{context}"
+
+Valid contexts:
+- Basic: {', '.join(valid_contexts)}
+- Similar to game: "similar_to:[game name]" (e.g., "similar_to:Portal 2")
+- By mood: "mood:[feeling]" (e.g., "mood:relaxing", "mood:intense")
+- By genre: "genre:[type]" (e.g., "genre:RPG", "genre:Strategy")
+
+Examples:
+- recommend_games(context="abandoned")
+- recommend_games(context="mood:relaxing", parameters="single player only")
+- recommend_games(context="similar_to:Hades", parameters="no roguelike")
+
+💡 Use 'get_tool_help("recommend_games")' for detailed examples.'''
+
+            return CallToolResult(
+                content=[TextContent(
+                    type="text",
+                    text=error_msg,
+                    annotations=Annotations(audience=["user"], priority=0.9)
+                )],
+                isError=True
+            )
+
         # Use elicitation to help user select appropriate context
         if ctx and hasattr(ctx, "elicit"):
             try:
@@ -340,15 +572,42 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
 
                     return await recommend_games(selected_context, new_params, use_play_history, ctx, user)
                 else:
-                    return "Recommendation cancelled by user."
+                    return CallToolResult(
+                        content=[TextContent(
+                            type="text",
+                            text="Recommendation cancelled by user.",
+                            annotations=Annotations(audience=["user"], priority=0.7)
+                        )],
+                        isError=False
+                    )
             except Exception as e:
-                return f"Could not gather recommendation preferences: {str(e)}"
+                return CallToolResult(
+                    content=[TextContent(
+                        type="text",
+                        text=f"Could not gather recommendation preferences: {str(e)}",
+                        annotations=Annotations(audience=["user"], priority=0.7)
+                    )],
+                    isError=True
+                )
         else:
-            return f"Invalid context '{context}'. Valid contexts: family, quick_session, similar_to, mood_based, unplayed_gems, abandoned"
+            error_msg = f'''Invalid context '{context}'.
+
+Valid contexts: {', '.join(valid_contexts + ['similar_to:[game]', 'mood:[feeling]', 'genre:[type]'])}
+
+💡 Use 'get_tool_help("recommend_games")' for detailed examples.'''
+
+            return CallToolResult(
+                content=[TextContent(
+                    type="text",
+                    text=error_msg,
+                    annotations=Annotations(audience=["user"], priority=0.9)
+                )],
+                isError=True
+            )
 
 
 # Helper functions for recommend_games
-async def recommend_family_games(params: dict, user_steam_id: str) -> str:
+async def recommend_family_games(params: dict, user_steam_id: str) -> CallToolResult:
     """Find age-appropriate family games."""
     age = params.get("age", 8)
     players = params.get("players", 1)
@@ -378,7 +637,23 @@ async def recommend_family_games(params: dict, user_steam_id: str) -> str:
             playtime_str = f"{user_game.playtime_forever / 60:.1f}h" if user_game.playtime_forever > 0 else "Unplayed"
             results.append(f"• **{game.name}**\n" f"  Age Rating: ESRB {game.esrb_rating or 'Unrated'}, PEGI {game.pegi_rating or 'Unrated'}\n" f"  Playtime: {playtime_str}")
 
-        return f"**Family games for age {age}+ with {players} player(s):**\n\n" + "\n\n".join(results)
+        output = f"**Family games for age {age}+ with {players} player(s):**\n\n" + "\n\n".join(results)
+        output += "\n\n💡 **Tip:** Use 'get_tool_help(\"find_family_games\")' for age rating guidelines."
+
+        return CallToolResult(
+            content=[TextContent(
+                type="text",
+                text=output,
+                annotations=Annotations(audience=["user"], priority=0.9)
+            )],
+            structuredContent={
+                "context": "family",
+                "age": age,
+                "players": players,
+                "games_found": len(results)
+            },
+            isError=False
+        )
 
 
 async def recommend_quick_session_games(params: dict, user_steam_id: str) -> str:
@@ -1223,3 +1498,234 @@ def get_max_pegi_for_age(age: int) -> str:
 def get_pegi_ratings_up_to(max_rating: str) -> list[str]:
     ratings = ["3", "7", "12", "16", "18"]
     return ratings[: ratings.index(max_rating) + 1]
+
+
+def format_tool_documentation(name: str, doc: dict) -> str:
+    """Format tool documentation for display."""
+    output = f"# {name} Tool Documentation\n\n"
+    output += f"## Description\n{doc['description']}\n\n"
+
+    if 'parameters' in doc:
+        output += "## Parameters\n"
+        for param, desc in doc['parameters'].items():
+            output += f"- **{param}**: {desc}\n"
+        output += "\n"
+
+    if 'contexts' in doc:
+        output += "## Available Contexts\n"
+        for ctx, desc in doc['contexts'].items():
+            output += f"- **{ctx}**: {desc}\n"
+        output += "\n"
+
+    if 'filter_examples' in doc:
+        output += "## Filter Examples\n"
+        for ex in doc['filter_examples']:
+            output += f"### {ex['description']}\n"
+            if 'query' in ex:
+                output += f"Query: `{ex['query']}`\n"
+            if 'value' in ex:
+                output += f"Filter: `{ex['value']}`\n"
+            if 'filters' in ex:
+                output += f"Filters: `{ex['filters']}`\n"
+            output += "\n"
+
+    if 'parameter_examples' in doc:
+        output += "## Usage Examples\n"
+        for ex in doc['parameter_examples']:
+            output += f"- Context: `{ex['context']}`\n"
+            output += f"  Parameters: `{ex['parameters']}`\n\n"
+
+    if 'common_errors' in doc:
+        output += "## Common Errors and Solutions\n"
+        for error, solution in doc['common_errors'].items():
+            output += f"- **{error}**: {solution}\n"
+
+    return output
+
+
+@mcp.tool(name="get_tool_help", title="Tool Documentation Helper", description="Get detailed help and examples for MCP tools with comprehensive documentation and usage patterns")
+async def get_tool_help(tool_name: str = None) -> CallToolResult:
+    """Get detailed help and examples for MCP tools.
+
+    Args:
+        tool_name: Name of tool to get help for. If None, lists all tools.
+
+    Returns:
+        Detailed documentation with examples, parameters, common errors, and usage patterns
+    """
+
+    tool_docs = {
+        "smart_search": {
+            "description": "Natural language game search with AI-powered filtering and flexible parameter parsing",
+            "parameters": {
+                "query": "Natural language search query (required) - can be game names, descriptions, or requests",
+                "filters": "Additional filters as JSON or natural language (optional)",
+                "limit": "Number of results to return, 1-50 (default: 10)",
+                "sort_by": "Sort method: relevance, playtime, metacritic, recent, random (default: relevance)",
+                "user": "Steam ID or username (uses default if not specified)"
+            },
+            "filter_examples": [
+                {
+                    "description": "JSON filter for action games rated 80+",
+                    "value": '{"genres": ["Action"], "min_rating": 80}'
+                },
+                {
+                    "description": "Natural language filter",
+                    "value": "multiplayer games released after 2020"
+                },
+                {
+                    "description": "Combined search with natural language filters",
+                    "query": "zombie survival games",
+                    "filters": "exclude horror genre, coop multiplayer"
+                },
+                {
+                    "description": "VR games filter",
+                    "value": "vr games"
+                },
+                {
+                    "description": "Unplayed games filter",
+                    "value": "unplayed indie games"
+                }
+            ],
+            "common_errors": {
+                "Invalid filters format": "Use valid JSON like {\"genres\": [\"Action\"]} or natural language like 'action games rated over 80'",
+                "Multiple users found": "Specify exact Steam ID or full username in the user parameter",
+                "No results found": "Try broader search terms, different genres, or check spelling"
+            }
+        },
+        "recommend_games": {
+            "description": "AI-powered personalized game recommendations with context-aware filtering and elicitation",
+            "contexts": {
+                "abandoned": "Games you started but haven't finished (1-10 hours played)",
+                "similar_to:[game]": "Find games similar to specified game (e.g., 'similar_to:Portal 2')",
+                "mood:[feeling]": "Games matching a mood (e.g., 'mood:relaxing', 'mood:competitive')",
+                "genre:[type]": "Smart genre-based recommendations (e.g., 'genre:RPG')",
+                "trending": "Popular games being played by many users recently",
+                "hidden_gems": "Highly-rated games with low player counts",
+                "completionist": "Games where you're close to 100% achievements",
+                "weekend": "Games perfect for weekend sessions (20-40 hour campaigns)",
+                "family": "Age-appropriate games (will ask for child's age)",
+                "quick_session": "Games for short sessions (will ask for available time)"
+            },
+            "parameter_examples": [
+                {
+                    "context": "abandoned",
+                    "parameters": "focus on games under 20 hours"
+                },
+                {
+                    "context": "mood:relaxing",
+                    "parameters": '{"exclude_genres": ["Horror", "Action"], "single_player": true}'
+                },
+                {
+                    "context": "similar_to:Portal 2",
+                    "parameters": "no puzzle games"
+                },
+                {
+                    "context": "genre:RPG",
+                    "parameters": "highly rated, no multiplayer"
+                }
+            ],
+            "common_errors": {
+                "Invalid context": "Use valid contexts like 'abandoned', 'mood:relaxing', or 'similar_to:[game name]'",
+                "Invalid parameters format": "Use JSON, natural language, or simple keywords. Avoid mixing formats.",
+                "Game not found for similar_to": "Check spelling of game name or use partial matches"
+            }
+        },
+        "get_library_insights": {
+            "description": "Deep analytics and insights about your gaming library and habits with AI interpretation",
+            "parameters": {
+                "analysis_type": "Type of analysis: patterns, gaps, value, social, achievements, trends",
+                "compare_to": "Comparison target (optional): friends, global, genre_average",
+                "time_range": "Period to analyze (default: all): all, recent, last_month",
+                "user": "Steam ID or username (uses default if not specified)"
+            },
+            "parameter_examples": [
+                {
+                    "context": "patterns",
+                    "parameters": "Get detailed gaming habit analysis"
+                },
+                {
+                    "context": "gaps",
+                    "parameters": "Find popular games in favorite genres you don't own"
+                },
+                {
+                    "context": "value",
+                    "parameters": "Analyze cost per hour and game value"
+                }
+            ]
+        },
+        "find_family_games": {
+            "description": "Find age-appropriate games for family gaming using ESRB/PEGI ratings",
+            "parameters": {
+                "child_age": "Age of youngest player (required) - determines appropriate rating limits",
+                "user": "Steam ID or username (uses default if not specified)"
+            },
+            "parameter_examples": [
+                {
+                    "context": "Age 8 child",
+                    "parameters": "child_age=8 (allows E and E10+ rated games)"
+                },
+                {
+                    "context": "Age 12 child",
+                    "parameters": "child_age=12 (allows up to T rated games)"
+                }
+            ]
+        },
+        "find_quick_session_games": {
+            "description": "Find games perfect for quick gaming sessions with smart tag analysis",
+            "parameters": {
+                "session_length": "Session type: 'short' (5-15min), 'medium' (15-30min), 'long' (30-60min)",
+                "user": "Steam ID or username (uses default if not specified)"
+            },
+            "parameter_examples": [
+                {
+                    "context": "Quick break games",
+                    "parameters": "session_length='short' for arcade and puzzle games"
+                },
+                {
+                    "context": "Lunch break gaming",
+                    "parameters": "session_length='medium' for balanced quick games"
+                }
+            ]
+        }
+    }
+
+    if tool_name:
+        if tool_name in tool_docs:
+            doc = tool_docs[tool_name]
+            formatted_help = format_tool_documentation(tool_name, doc)
+        else:
+            error_msg = f"Unknown tool: {tool_name}\n\nAvailable tools: {', '.join(tool_docs.keys())}\n\n💡 Use get_tool_help() without parameters to see all tools."
+            return CallToolResult(
+                content=[TextContent(
+                    type="text",
+                    text=error_msg,
+                    annotations=Annotations(audience=["user"], priority=0.8)
+                )],
+                isError=True
+            )
+    else:
+        formatted_help = "# Steam Librarian MCP Tools Help\n\n"
+        formatted_help += "Available tools with comprehensive documentation:\n\n"
+        for name, doc in tool_docs.items():
+            formatted_help += f"## {name}\n{doc['description']}\n\n"
+        formatted_help += "\n💡 **Usage:** get_tool_help(tool_name='[name]') for detailed help with examples\n"
+        formatted_help += "\n**Quick Tips:**\n"
+        formatted_help += "- Use natural language in queries and filters\n"
+        formatted_help += "- All tools support both JSON and text parameters\n"
+        formatted_help += "- Error messages include working examples\n"
+        formatted_help += "- Tools provide structured data for further processing\n"
+
+    return CallToolResult(
+        content=[TextContent(
+            type="text",
+            text=formatted_help,
+            annotations=Annotations(audience=["user"], priority=0.9)
+        )],
+        structuredContent={
+            "tool_name": tool_name,
+            "available_tools": list(tool_docs.keys()),
+            "documentation_type": "comprehensive" if tool_name else "overview"
+        },
+        isError=False
+    )
