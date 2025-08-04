@@ -1,7 +1,13 @@
-"""MCP tools using proper database schema and ORM"""
+"""Enhanced MCP tools with full specification compliance including input/output schemas and structured responses"""
 
 from mcp.server.fastmcp import Context
-from mcp.types import SamplingMessage, TextContent
+from mcp.types import (
+    Annotations,
+    CallToolResult,
+    SamplingMessage,
+    TextContent,
+    ToolAnnotations,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import joinedload
@@ -51,22 +57,30 @@ def is_natural_language_query(query: str) -> bool:
     return any(indicator in query_lower for indicator in nl_indicators)
 
 
-@mcp.tool()
-async def smart_search(query: str, filters: str = "", sort_by: str = "relevance", limit: int = 10, ctx: Context | None = None, user: str | None = None) -> str:  # JSON string: {"genres": [], "categories": [], "tags": [], "playtime": "any"}  # relevance|playtime|metacritic|recent|random
+@mcp.tool(name="smart_search", title="AI-Powered Game Search", description="Unified smart search across all game classification layers with natural language interpretation and AI-powered filtering", annotations=ToolAnnotations(title="Advanced Game Discovery", readOnlyHint=True, idempotentHint=True))
+async def smart_search(query: str, filters: str = "", sort_by: str = "relevance", limit: int = 10, ctx: Context | None = None, user: str | None = None) -> CallToolResult:
     """
-    Unified smart search across all game classification layers.
+    Unified smart search across all game classification layers with AI interpretation.
+
+    Args:
+        query: Search query - can be game names, natural language descriptions, or specific requests
+        filters: JSON string with filter criteria: {"genres": [], "categories": [], "tags": [], "playtime": "any"}
+        sort_by: Sort order - relevance|playtime|metacritic|recent|random
+        limit: Maximum number of results to return (1-50)
+        ctx: MCP context for AI sampling and elicitation
+        user: Steam user identifier (optional, uses default if not provided)
 
     Examples:
-    - query="minecraft" - Simple name search
-    - query="relaxing", filters='{"tags": ["Casual", "Puzzle"]}' - Filtered search
-    - query="unplayed gems", filters='{"playtime": "unplayed"}' - Unplayed with good scores
+        - query="minecraft" - Simple name search
+        - query="relaxing puzzle games" - Natural language search with AI interpretation
+        - query="unplayed gems", filters='{"playtime": "unplayed"}' - Unplayed with good scores
     """
     import json
 
     # Resolve user
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
-        return f"User error: {user_result['message']}"
+        return CallToolResult(content=[TextContent(type="text", text=f"User error: {user_result['message']}", annotations=Annotations(audience=["assistant"], priority=0.9))], isError=True)
 
     user_steam_id = user_result["steam_id"]
 
@@ -76,7 +90,7 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
         try:
             filter_dict = json.loads(filters)
         except json.JSONDecodeError:
-            return "Invalid filters format. Please provide valid JSON."
+            return CallToolResult(content=[TextContent(type="text", text="Invalid filters format. Please provide valid JSON.", annotations=Annotations(audience=["assistant"], priority=0.8))], isError=True)
 
     # Use Sampling for natural language queries
     if ctx and hasattr(ctx, "session") and ctx.session and is_natural_language_query(query):
@@ -176,9 +190,10 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
             results.append({"name": game.name, "metacritic": game.metacritic_score, "platforms": {"windows": game.platforms_windows, "mac": game.platforms_mac, "linux": game.platforms_linux, "vr": game.vr_support}, "playtime": user_game.playtime_forever / 60 if user_game.playtime_forever else 0, "recent_playtime": user_game.playtime_2weeks / 60 if user_game.playtime_2weeks else 0, "genres": [g.genre_name for g in game.genres[:3]], "tags": [t.tag_name for t in game.tags[:3]]})
 
         if not results:
-            return f"No games found matching '{query}'" + (f" with filters: {filter_dict}" if filter_dict else "")
+            no_results_msg = f"No games found matching '{query}'" + (f" with filters: {filter_dict}" if filter_dict else "")
+            return CallToolResult(content=[TextContent(type="text", text=no_results_msg, annotations=Annotations(audience=["assistant"], priority=0.7))], structuredContent={"results": [], "query": query, "filters": filter_dict, "total": 0}, isError=False)
 
-        # Format enhanced results
+        # Format enhanced results for display
         output = [f"**Smart search results for '{query}':**"]
         if filter_dict:
             output.append(f"Applied filters: {filter_dict}")
@@ -212,28 +227,39 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
 
             output.append(f"• **{game['name']}**{metacritic_str}{activity}\n" f"  Genres: {genres_str} | Platforms: {platform_str}\n" f"  Playtime: {game['playtime']:.1f}h" + (f" (recent: {game['recent_playtime']:.1f}h)" if game["recent_playtime"] > 0 else "") + (f"\n  Tags: {tags_str}" if tags_str else ""))
 
-        return "\n".join(output)
+        # Return structured content with both text display and structured data
+        return CallToolResult(content=[TextContent(type="text", text="\n".join(output), annotations=Annotations(audience=["user", "assistant"], priority=0.9))], structuredContent={"results": results, "query": query, "filters": filter_dict, "sort_by": sort_by, "total": len(results), "limited": len(results) == limit}, isError=False)
 
 
-@mcp.tool()
-async def recommend_games(context: str, parameters: str = "", use_play_history: bool = True, ctx: Context | None = None, user: str | None = None) -> str:  # family|quick_session|similar_to|mood_based|unplayed_gems|abandoned  # JSON string with context-specific params
+@mcp.tool(name="recommend_games", title="Context-Aware Game Recommendations", description="Intelligent game recommendations with interactive elicitation for missing parameters and context-aware filtering", annotations=ToolAnnotations(title="AI-Powered Recommendations", readOnlyHint=True, idempotentHint=False, openWorldHint=True))  # Results may vary based on elicitation  # Context parameter has many possible values
+async def recommend_games(context: str, parameters: str = "", use_play_history: bool = True, ctx: Context | None = None, user: str | None = None) -> CallToolResult:
     """
-    Intelligent game recommendations based on context and play patterns.
+    Intelligent game recommendations with interactive elicitation for enhanced user experience.
+
+    Args:
+        context: Recommendation context - family|quick_session|similar_to|mood_based|unplayed_gems|abandoned
+        parameters: JSON string with context-specific parameters (will elicit if missing critical data)
+        use_play_history: Whether to incorporate user's play history in recommendations
+        ctx: MCP context for elicitation and AI sampling
+        user: Steam user identifier (optional, uses default if not provided)
 
     Contexts:
-    - family: Age-appropriate games (params: {"age": 8, "players": 2})
-    - quick_session: Short gaming sessions (params: {"minutes": 30})
-    - similar_to: Games similar to one you specify (params: {"game": "Portal"})
-    - mood_based: Based on current mood (params: {"mood": "relaxing"})
-    - unplayed_gems: High-rated games you haven't played
-    - abandoned: Games you started but didn't finish
+        - family: Age-appropriate games (elicits: age, players, content_concerns)
+        - quick_session: Short gaming sessions (elicits: available_minutes, energy_level)
+        - similar_to: Games similar to specified game (elicits: game_name, similarity_aspects)
+        - mood_based: Based on current mood (elicits: mood, desired_intensity)
+        - unplayed_gems: High-rated games you haven't played
+        - abandoned: Games you started but didn't finish
+
+    Returns:
+        CallToolResult with personalized recommendations, structured data, and potential resource links
     """
     import json
 
     # Resolve user
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
-        return f"User error: {user_result['message']}"
+        return CallToolResult(content=[TextContent(type="text", text=f"User error: {user_result['message']}", annotations=Annotations(audience=["assistant"], priority=0.9))], isError=True)
 
     user_steam_id = user_result["steam_id"]
 
@@ -243,26 +269,27 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
         try:
             params = json.loads(parameters)
         except json.JSONDecodeError:
-            return "Invalid parameters format. Please provide valid JSON."
+            return CallToolResult(content=[TextContent(type="text", text="Invalid parameters format. Please provide valid JSON.", annotations=Annotations(audience=["assistant"], priority=0.8))], isError=True)
 
-    # Use elicitation for missing parameters
+    # Enhanced elicitation with proper MCP JSON schemas
     if context == "family" and ctx and hasattr(ctx, "elicit"):
         if "age" not in params:
-            # Elicit age information
-            class FamilyGameParams(BaseModel):
-                age: int = Field(description="Age of youngest player")
-                players: int = Field(default=1, description="Number of players")
-                content_concerns: list[str] = Field(default=[], description="Content to avoid (violence, scary, complex)")
-
             try:
-                result = await ctx.elicit(message="I need some information to find the best family games", schema=FamilyGameParams)
+                # Use proper MCP elicitation JSON schema instead of Pydantic
+                elicitation_result = await ctx.elicit(message="I need some information to find the best family-friendly games for you", requestedSchema={"type": "object", "properties": {"age": {"type": "integer", "title": "Child's Age", "description": "Age of the youngest player who will be playing", "minimum": 3, "maximum": 17}, "players": {"type": "integer", "title": "Number of Players", "description": "How many people will be playing together?", "minimum": 1, "maximum": 8, "default": 1}, "content_concerns": {"type": "string", "title": "Content to Avoid", "description": "Any content you want to avoid (violence, scary themes, complex mechanics, etc.)", "enum": ["none", "violence", "scary", "complex", "violence_and_scary", "all_mature_content"], "enumNames": ["No specific concerns", "Violence", "Scary content", "Complex mechanics", "Violence and scary content", "All mature content"], "default": "none"}}, "required": ["age"]})
 
-                if result.action == "accept" and result.data:
-                    params.update(result.data.dict())
+                if elicitation_result.action == "accept" and elicitation_result.content:
+                    params.update(elicitation_result.content)
+                elif elicitation_result.action == "decline":
+                    return CallToolResult(content=[TextContent(type="text", text="I understand you'd prefer not to provide that information. I'll use default family-friendly settings (age 8+).", annotations=Annotations(audience=["user"], priority=0.8))], structuredContent={"context": context, "elicitation_declined": True}, isError=False)
+                elif elicitation_result.action == "cancel":
+                    return CallToolResult(content=[TextContent(type="text", text="Request cancelled. You can try again anytime with recommend_games('family') or provide parameters directly.", annotations=Annotations(audience=["user"], priority=0.7))], structuredContent={"context": context, "elicitation_cancelled": True}, isError=False)
+
             except Exception:
-                # Continue with default values
+                # Fallback gracefully if elicitation fails
                 params.setdefault("age", 8)
                 params.setdefault("players", 1)
+                params.setdefault("content_concerns", "none")
 
     # Context-specific recommendation logic
     if context == "family":

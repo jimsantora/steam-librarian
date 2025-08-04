@@ -1,111 +1,94 @@
-"""Engaging MCP prompts that showcase Steam Librarian's AI-powered features"""
+"""Enhanced MCP prompts with proper annotations and argument descriptions for full specification compliance"""
 
 from mcp.server.fastmcp.prompts import base
+from mcp.types import Annotations, ResourceLink, TextContent
 
 from .server import mcp
 
 
-@mcp.prompt(title="🧠 AI Smart Search Showcase")
-def smart_search_demo(query: str = "something like Portal but family-friendly") -> str:
-    """Demonstrate natural language search with AI sampling."""
-    return f"""Use smart_search to find games with this natural language query: "{query}"
+@mcp.prompt(name="family_games", title="Find Family-Friendly Games", description="Get age-appropriate game recommendations with ESRB/PEGI filtering for safe family gaming")
+def family_games(child_age: int = 8) -> list[base.Message]:
+    """Get age-appropriate game recommendations for family gaming.
 
-This showcases our AI sampling feature that interprets human language and converts it to structured game filters. Try queries like:
-- "couch co-op games for date night"
-- "unplayed indie gems that won't make me cry"
-- "quick session puzzle games for my lunch break"
-- "family games that won't bore the adults to tears"
-
-The AI will automatically understand context, mood, and requirements!"""
+    Args:
+        child_age: Age of the child in years (used for ESRB/PEGI rating filtering, default: 8)
+    """
+    return [base.UserMessage(TextContent(type="text", text=f"I need games suitable for my {child_age}-year-old child. What do you recommend?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=f"I'll find age-appropriate games for a {child_age}-year-old using our family-safe filtering system with ESRB and PEGI ratings.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(TextContent(type="text", text=f"Use recommend_games('family', '{{\"age\": {child_age}}}') to get games rated for this age group.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="🎯 Intelligent Recommendations")
-def recommendation_showcase() -> list[base.Message]:
-    """Show off context-aware recommendations with elicitation."""
-    return [base.UserMessage("I need game recommendations but I'm not sure what I want"), base.AssistantMessage("Perfect! Let me use our recommend_games tool. I can help with several contexts: family games (specify age), quick sessions (how many minutes?), games similar to ones you love, mood-based picks, or unplayed gems sitting in your library. What sounds interesting?"), base.UserMessage("Something for my 8-year-old nephew who visits on weekends"), base.AssistantMessage("Great choice! I'll use: recommend_games('family', '{\"age\": 8, \"players\": 2}') - this leverages our ESRB/PEGI rating system and family-friendly category filtering. If you don't provide the age, our elicitation system will ask for it automatically!"), base.UserMessage("What about finding games I've abandoned?"), base.AssistantMessage("Ah, the digital graveyard investigation! Use recommend_games('abandoned') - this analyzes your library for games you started but never finished. It's like archaeology, but for your gaming guilt!")]
+@mcp.prompt(name="quick_session", title="Quick Gaming Session", description="Find games perfect for short gaming sessions based on available time")
+def quick_session(minutes_available: int = 30) -> list[base.Message]:
+    """Find games perfect for short gaming sessions.
+
+    Args:
+        minutes_available: Available gaming time in minutes (default: 30)
+    """
+    return [base.UserMessage(TextContent(type="text", text=f"I only have {minutes_available} minutes to play. What games would work well for a quick session?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=f"Let me find games that are perfect for {minutes_available}-minute sessions using smart tag analysis.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(TextContent(type="text", text=f"Use recommend_games('quick_session', '{{\"minutes\": {minutes_available}}}') to get games suitable for short play sessions.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="📊 Deep Library Analytics")
-def library_insights_demo(analysis_type: str = "patterns") -> str:
-    """Showcase comprehensive library analytics with AI interpretation."""
-    return f"""Analyze my gaming habits with get_library_insights('{analysis_type}').
-
-Our analytics engine provides several fascinating insights:
-
-🔍 **patterns**: Discover your gaming DNA - favorite genres, developers you're loyal to, and when you actually play vs. buy games
-📈 **value**: Calculate cost-per-hour for your games (prepare for buyer's remorse or pleasant surprises!)
-🕳️ **gaps**: Find missing gems in your collection based on your preferences
-👥 **social**: Compare your library to friends (when friends data is available)
-🏆 **achievements**: Track your completion obsession (or lack thereof)
-📊 **trends**: See how your gaming tastes evolved over time
-
-The AI will interpret patterns and suggest what type of gamer you are - might be eye-opening!"""
+@mcp.prompt(name="unplayed_gems", title="Discover Unplayed Games", description="Find highly-rated games in your library that you haven't played yet with embedded resource data")
+def unplayed_gems() -> list[base.Message]:
+    """Find highly-rated games in your library that you haven't played yet."""
+    return [base.UserMessage(TextContent(type="text", text="I have so many games in my library but I don't know what to play. Help me find some good ones I haven't tried yet.", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text="I'll help you discover hidden gems in your library - games you own but haven't played yet. Let me show you what's available.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(ResourceLink(type="resource_link", uri="library://games/unplayed", name="unplayed_games", description="Your highly-rated unplayed games with Metacritic scores ≥75", mimeType="application/json")), base.AssistantMessage(TextContent(type="text", text="Based on your unplayed games above, I recommend using recommend_games('unplayed_gems') to get personalized suggestions from these titles.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="🎮 Session Planning Wizard")
-def gaming_session_planner(time_available: str = "45 minutes", energy_level: str = "mentally exhausted") -> str:
-    """Plan perfect gaming sessions using smart search and recommendations."""
-    return f"""I have {time_available} and I'm feeling {energy_level}. Plan my gaming session!
+@mcp.prompt(name="similar_games", title="Games Similar To Favorite", description="Find games similar to one you already love by analyzing genres, developers, and gameplay features")
+def similar_games(game_name: str = "Portal") -> list[base.Message]:
+    """Find games similar to one you already love.
 
-Use our tools together for the perfect experience:
-1. **smart_search** with filters like '{{"playtime": "any", "tags": ["Relaxing", "Casual"]}}' for low-energy days
-2. **recommend_games** with 'quick_session' context and '{{"minutes": 45}}' parameters
-3. **get_library_insights** to see your 'patterns' and avoid games that might stress you out
-
-For {energy_level} moods, try:
-- Puzzle games (engage brain without overwhelming it)
-- Simulation games (zen-like, no pressure)
-- Casual games (designed for quick satisfaction)
-- Avoid: Competitive multiplayer, Dark Souls, anything requiring quick reflexes!"""
+    Args:
+        game_name: Name of the game you enjoyed (default: Portal)
+    """
+    return [base.UserMessage(TextContent(type="text", text=f"I really enjoyed {game_name}. Can you recommend similar games from my library?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=f"I'll find games similar to {game_name} by analyzing genres, developers, and gameplay features.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(TextContent(type="text", text=f"Use recommend_games('similar_to', '{{\"game_name\": \"{game_name}\"}}') to find games with similar characteristics.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="👨‍👩‍👧‍👦 Family Gaming Coordinator")
-def family_gaming_helper() -> list[base.Message]:
-    """Demonstrate family-appropriate game finding with age filtering."""
-    return [base.UserMessage("Help me find games for family game night - kids are 6, 10, and 14"), base.AssistantMessage("Multi-age family gaming! This is where our ESRB/PEGI filtering shines. I'll find games rated for your youngest (6-year-old) that won't bore the teenagers. Let me use smart_search with family-specific filters."), base.UserMessage("What about local multiplayer options?"), base.AssistantMessage('Perfect! Use smart_search(\'family multiplayer\', \'{"categories": ["Local Co-op", "Shared/Split Screen"], "playtime": "any"}\') - this finds games where everyone can play together on one screen. No fighting over who gets the good controller!'), base.UserMessage("Any way to avoid games with violence?"), base.AssistantMessage('Absolutely! Our system tracks ESRB descriptors. Use recommend_games(\'family\', \'{"age": 6, "content_concerns": ["violence", "scary"]}\') and our elicitation system will help you specify exactly what to avoid. Peace, love, and pizza parties!')]
+@mcp.prompt(name="natural_search", title="Natural Language Game Search", description="Search your library using natural language descriptions with AI interpretation")
+def natural_search(query: str = "relaxing puzzle games") -> list[base.Message]:
+    """Search your library using natural language descriptions.
+
+    Args:
+        query: Natural language description of games you're looking for (default: "relaxing puzzle games")
+    """
+    return [base.UserMessage(TextContent(type="text", text=f"I'm looking for {query}. Can you search my library?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=f"I'll search your library for '{query}' using AI to interpret your request and find matching games.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(TextContent(type="text", text=f"Use smart_search('{query}') to find games matching this description.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="🕵️ Unplayed Game Detective")
-def unplayed_gems_finder() -> str:
-    """Find and analyze the games gathering dust in your library."""
-    return """Time for some digital archaeology! Let's excavate your unplayed games:
+@mcp.prompt(name="gaming_insights", title="Analyze Gaming Patterns", description="Get AI-powered insights about your gaming habits and preferences with embedded library data")
+def gaming_insights(analysis_type: str = "patterns") -> list[base.Message]:
+    """Get AI-powered insights about your gaming habits and preferences.
 
-**Step 1**: Use smart_search('unplayed gems', '{"playtime": "unplayed", "sort_by": "metacritic"}') to find highly-rated games you've never touched.
-
-**Step 2**: Try recommend_games('unplayed_gems') for curated recommendations based on your play history.
-
-**Step 3**: Get philosophical with get_library_insights('value') to see how much money is sitting unplayed in your library (warning: may cause existential crisis).
-
-Fun fact: Our AI can analyze your playing patterns and predict which unplayed games you're most likely to actually enjoy, versus the ones you bought during a sale and will never touch. It's like having a crystal ball for your gaming backlog!"""
+    Args:
+        analysis_type: Type of analysis to perform - patterns, value, social, genres, etc. (default: "patterns")
+    """
+    return [base.UserMessage(TextContent(type="text", text="I'm curious about my gaming habits. Can you analyze my library and tell me what patterns you see?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text="I'll analyze your gaming patterns and provide insights about your preferences, habits, and gaming personality. Let me start by looking at your library overview.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(ResourceLink(type="resource_link", uri="library://overview", name="library_overview", description="Your complete library overview with statistics, top genres, and gaming insights", mimeType="application/json")), base.AssistantMessage(TextContent(type="text", text=f"Based on your library data above, use get_library_insights('{analysis_type}') to get AI-powered analysis of your gaming patterns.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="🎲 Mood-Based Game Picker")
-def mood_gaming() -> str:
-    """Match games to your current emotional state."""
-    return """What's your vibe today? Our mood-based system has you covered:
+@mcp.prompt(name="mood_games", title="Mood-Based Game Selection", description="Get game recommendations based on your current mood by analyzing genres, tags, and gameplay styles")
+def mood_games(mood: str = "relaxing") -> list[base.Message]:
+    """Get game recommendations based on your current mood.
 
-😌 **Feeling chill?** recommend_games('mood_based', '{"mood": "relaxing"}')
-⚡ **Need energy?** recommend_games('mood_based', '{"mood": "energetic"}')
-🏆 **Competitive spirit?** recommend_games('mood_based', '{"mood": "competitive"}')
-👥 **Social but tired?** recommend_games('mood_based', '{"mood": "social"}')
-🎨 **Creative itch?** recommend_games('mood_based', '{"mood": "creative"}')
-📖 **Story time?** recommend_games('mood_based', '{"mood": "story"}')
-
-Our AI analyzes your library's genres, tags, and your play patterns to suggest games that match your emotional needs. It's like having a therapist who really understands your Steam addiction!"""
+    Args:
+        mood: Your current emotional state - relaxing, energetic, challenging, social, etc. (default: "relaxing")
+    """
+    return [base.UserMessage(TextContent(type="text", text=f"I'm feeling {mood} today. What games would match this mood?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=f"I'll recommend games that match a {mood} mood by analyzing genres, tags, and gameplay styles.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(TextContent(type="text", text=f"Use recommend_games('mood_based', '{{\"mood\": \"{mood}\"}}') to get games matching this emotional state.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
 
-@mcp.prompt(title="🔍 Library Resource Explorer")
-def resource_showcase() -> str:
-    """Explore all the rich data available through our resources."""
-    return """Dive deep into your library data with our comprehensive resources:
+@mcp.prompt(name="abandoned_games", title="Find Abandoned Games", description="Rediscover games you started but never finished - perfect candidates for revisiting")
+def abandoned_games() -> list[base.Message]:
+    """Rediscover games you started but never finished."""
+    return [base.UserMessage(TextContent(type="text", text="I have a habit of starting games but not finishing them. Can you help me find games I should revisit?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text="I'll find games in your library that you started playing but haven't touched in a while - perfect candidates for revisiting.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(TextContent(type="text", text="Use recommend_games('abandoned') to find games you have some playtime in but haven't completed or played recently.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
 
-📋 **Library Overview**: library://overview (your gaming life at a glance)
-👤 **User Profile**: library://users/default (your Steam identity and stats)
-🎮 **Game Details**: library://games/{app_id} (everything about any game)
-🖥️ **Platform Games**: library://games/platform/windows (or mac/linux/vr)
-👫 **Multiplayer**: library://games/multiplayer/coop (or pvp/local/online)
-💎 **Unplayed Gems**: library://games/unplayed (your digital regrets waiting to be redeemed)
-🎯 **Genre Deep-Dive**: library://genres/{genre_name}/games
-🏷️ **Tag Explorer**: library://tags/{tag_name} (community wisdom in action)
 
-Each resource provides rich JSON data with metadata, relationships, and insights. It's like having a data scientist for your gaming habits!"""
+@mcp.prompt(name="explore_genre", title="Explore Games by Genre", description="Explore all games in your library by a specific genre with embedded game data")
+def explore_genre(genre_name: str = "Puzzle") -> list[base.Message]:
+    """Explore all games in your library by a specific genre.
+
+    Args:
+        genre_name: Genre to explore - Action, Adventure, RPG, Strategy, Puzzle, etc. (default: "Puzzle")
+    """
+    return [base.UserMessage(TextContent(type="text", text=f"I'm interested in {genre_name} games. Can you show me what I have in my library?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=f"I'll show you all the {genre_name} games in your library with their details and playtime information.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(ResourceLink(type="resource_link", uri=f"library://genres/{genre_name}/games", name=f"{genre_name.lower()}_games", description=f"All {genre_name} games in your library with developers and review scores", mimeType="application/json")), base.AssistantMessage(TextContent(type="text", text=f"Here are your {genre_name} games! You can also use smart_search('{genre_name.lower()} games') to find specific ones based on other criteria.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
+
+
+@mcp.prompt(name="user_profile", title="View User Profile & Stats", description="View your complete Steam profile and gaming statistics with embedded profile data")
+def user_profile() -> list[base.Message]:
+    """View your complete Steam profile and gaming statistics."""
+    return [base.UserMessage(TextContent(type="text", text="Can you show me my Steam profile and gaming statistics?", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text="I'll display your complete Steam profile including gaming statistics, library overview, and account details.", annotations=Annotations(audience=["assistant"], priority=0.8))), base.UserMessage(ResourceLink(type="resource_link", uri="library://users/default", name="user_profile", description="Your complete Steam profile with persona, level, XP, location, and game count", mimeType="application/json")), base.AssistantMessage(TextContent(type="text", text="Here's your profile! You can also access library://users/default/games for your complete game list or library://users/default/stats for detailed gaming statistics.", annotations=Annotations(audience=["assistant"], priority=0.7)))]
