@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp.types import TextResourceContents
 from sqlalchemy.orm import joinedload
@@ -29,49 +29,20 @@ def get_default_user_fallback():
     return None
 
 
-def create_resource_content(
-    uri: str,
-    name: str,
-    title: str,
-    description: str,
-    data: Dict[str, Any],
-    priority: float = 0.5,
-    audience: List[str] = None,
-    mime_type: str = "application/json"
-) -> TextResourceContents:
+def create_resource_content(uri: str, name: str, title: str, description: str, data: dict[str, Any], priority: float = 0.5, audience: list[str] = None, mime_type: str = "application/json") -> TextResourceContents:
     """Create properly formatted resource content with metadata and annotations."""
     if audience is None:
         audience = ["user", "assistant"]
-    
+
     # Annotations go in the meta field for MCP
-    meta = {
-        "audience": audience,
-        "priority": priority,
-        "lastModified": datetime.now().isoformat() + "Z",
-        "name": name,
-        "title": title,
-        "description": description
-    }
-    
-    return TextResourceContents(
-        uri=uri,
-        mimeType=mime_type,
-        text=json.dumps(data, indent=2),
-        _meta=meta
-    )
+    meta = {"audience": audience, "priority": priority, "lastModified": datetime.now().isoformat() + "Z", "name": name, "title": title, "description": description}
+
+    return TextResourceContents(uri=uri, mimeType=mime_type, text=json.dumps(data, indent=2), _meta=meta)
 
 
 def create_error_resource(uri: str, name: str, error_message: str) -> TextResourceContents:
     """Create error resource content with appropriate metadata."""
-    return create_resource_content(
-        uri=uri,
-        name=name,
-        title="Resource Error",
-        description=f"Error accessing resource: {error_message}",
-        data={"error": error_message},
-        priority=0.1,
-        audience=["assistant"]
-    )
+    return create_resource_content(uri=uri, name=name, title="Resource Error", description=f"Error accessing resource: {error_message}", data={"error": error_message}, priority=0.1, audience=["assistant"])
 
 
 @mcp.resource("library://games/{game_id}")
@@ -79,7 +50,7 @@ def get_game_details(game_id: str) -> TextResourceContents:
     """Get comprehensive game details by ID with all available metadata."""
     uri = f"library://games/{game_id}"
     name = f"game_{game_id}"
-    
+
     try:
         # Try to get default user for personalized stats
         user_steam_id = None
@@ -137,15 +108,7 @@ def get_game_details(game_id: str) -> TextResourceContents:
             else:
                 game_data["user_stats"] = {"note": "No user context available for personalized stats"}
 
-            return create_resource_content(
-                uri=uri,
-                name=name,
-                title=f"Game Details: {game.name}",
-                description=f"Complete metadata for {game.name} including ratings, genres, playtime, and user statistics",
-                data=game_data,
-                priority=0.8,  # High priority for game details
-                audience=["user", "assistant"]
-            )
+            return create_resource_content(uri=uri, name=name, title=f"Game Details: {game.name}", description=f"Complete metadata for {game.name} including ratings, genres, playtime, and user statistics", data=game_data, priority=0.8, audience=["user", "assistant"])  # High priority for game details
 
     except Exception as e:
         return create_error_resource(uri, name, f"Failed to get game details: {str(e)}")
@@ -156,7 +119,7 @@ def library_overview() -> TextResourceContents:
     """Get library overview with navigation to user-specific resources."""
     uri = "library://overview"
     name = "library_overview"
-    
+
     try:
         with get_db() as session:
             # Get basic system stats
@@ -187,15 +150,7 @@ def library_overview() -> TextResourceContents:
 
             overview = {"message": "Steam Library MCP Server Overview", "statistics": {"total_games": total_games, "total_users": total_users, "total_genres": total_genres}, "default_user": default_user_info, "top_genres": genre_counts[:10], "available_resources": {"users": "library://users - List all users", "user_profile": "library://users/{user_id} - Get user profile (use 'default' for default user)", "user_games": "library://users/{user_id}/games - Get user's complete game library", "user_stats": "library://users/{user_id}/stats - Get user's gaming statistics", "game_details": "library://games/{game_id} - Get detailed game information", "platform_games": "library://games/platform/{platform} - Games by platform (windows/mac/linux/vr)", "multiplayer_games": "library://games/multiplayer/{type} - Games by multiplayer type (coop/pvp/local/online)", "unplayed_games": "library://games/unplayed - Highly-rated unplayed games", "genres": "library://genres - List all genres", "games_by_genre": "library://genres/{genre_name}/games - Get games in specific genre", "tags": "library://tags - List all community tags", "games_by_tag": "library://tags/{tag_name} - Get games with specific tag"}, "tools_available": ["search_games - Natural language search with AI interpretation", "analyze_library - Deep analysis with AI-generated insights", "generate_recommendation - AI-powered game recommendations", "find_games_with_preferences - Interactive preference-based search with elicitation", "find_family_games - Age-appropriate games with ESRB/PEGI filtering", "find_quick_session_games - Smart tag-based analysis for quick sessions"]}
 
-            return create_resource_content(
-                uri=uri,
-                name=name,
-                title="Steam Library Overview",
-                description="Complete library statistics, user information, and available resources navigation",
-                data=overview,
-                priority=0.9,  # Very high priority for overview
-                audience=["user", "assistant"]
-            )
+            return create_resource_content(uri=uri, name=name, title="Steam Library Overview", description="Complete library statistics, user information, and available resources navigation", data=overview, priority=0.9, audience=["user", "assistant"])  # Very high priority for overview
 
     except Exception as e:
         return create_error_resource(uri, name, f"Failed to get overview: {str(e)}")
@@ -551,7 +506,7 @@ def get_unplayed_gems() -> TextResourceContents:
     """Get highly-rated unplayed games (default min_rating=75)."""
     uri = "library://games/unplayed"
     name = "unplayed_games"
-    
+
     try:
         # Use default user for personal library context
         user_result = resolve_user_for_tool(None, get_default_user_fallback)
@@ -579,15 +534,7 @@ def get_unplayed_gems() -> TextResourceContents:
 
             unplayed_data = {"user": user_profile.persona_name, "min_rating": min_rating, "total_games": len(games_data), "games": games_data}
 
-            return create_resource_content(
-                uri=uri,
-                name=name,
-                title="Highly-Rated Unplayed Games",
-                description=f"Unplayed games in your library with Metacritic score ≥{min_rating} - perfect for discovering hidden gems",
-                data=unplayed_data,
-                priority=0.9,  # Very high priority for recommendations
-                audience=["user", "assistant"]
-            )
+            return create_resource_content(uri=uri, name=name, title="Highly-Rated Unplayed Games", description=f"Unplayed games in your library with Metacritic score ≥{min_rating} - perfect for discovering hidden gems", data=unplayed_data, priority=0.9, audience=["user", "assistant"])  # Very high priority for recommendations
 
     except Exception as e:
         return create_error_resource(uri, name, f"Failed to get unplayed gems: {str(e)}")

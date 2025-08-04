@@ -4,7 +4,6 @@ from mcp.server.fastmcp import Context
 from mcp.types import (
     Annotations,
     CallToolResult,
-    ResourceLink,
     SamplingMessage,
     TextContent,
     ToolAnnotations,
@@ -58,16 +57,7 @@ def is_natural_language_query(query: str) -> bool:
     return any(indicator in query_lower for indicator in nl_indicators)
 
 
-@mcp.tool(
-    name="smart_search",
-    title="AI-Powered Game Search",
-    description="Unified smart search across all game classification layers with natural language interpretation and AI-powered filtering",
-    annotations=ToolAnnotations(
-        title="Advanced Game Discovery",
-        readOnlyHint=True,
-        idempotentHint=True
-    )
-)
+@mcp.tool(name="smart_search", title="AI-Powered Game Search", description="Unified smart search across all game classification layers with natural language interpretation and AI-powered filtering", annotations=ToolAnnotations(title="Advanced Game Discovery", readOnlyHint=True, idempotentHint=True))
 async def smart_search(query: str, filters: str = "", sort_by: str = "relevance", limit: int = 10, ctx: Context | None = None, user: str | None = None) -> CallToolResult:
     """
     Unified smart search across all game classification layers with AI interpretation.
@@ -90,16 +80,7 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
     # Resolve user
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=f"User error: {user_result['message']}",
-                    annotations=Annotations(audience=["assistant"], priority=0.9)
-                )
-            ],
-            isError=True
-        )
+        return CallToolResult(content=[TextContent(type="text", text=f"User error: {user_result['message']}", annotations=Annotations(audience=["assistant"], priority=0.9))], isError=True)
 
     user_steam_id = user_result["steam_id"]
 
@@ -109,16 +90,7 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
         try:
             filter_dict = json.loads(filters)
         except json.JSONDecodeError:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="Invalid filters format. Please provide valid JSON.",
-                        annotations=Annotations(audience=["assistant"], priority=0.8)
-                    )
-                ],
-                isError=True
-            )
+            return CallToolResult(content=[TextContent(type="text", text="Invalid filters format. Please provide valid JSON.", annotations=Annotations(audience=["assistant"], priority=0.8))], isError=True)
 
     # Use Sampling for natural language queries
     if ctx and hasattr(ctx, "session") and ctx.session and is_natural_language_query(query):
@@ -219,17 +191,7 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
 
         if not results:
             no_results_msg = f"No games found matching '{query}'" + (f" with filters: {filter_dict}" if filter_dict else "")
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text=no_results_msg,
-                        annotations=Annotations(audience=["assistant"], priority=0.7)
-                    )
-                ],
-                structuredContent={"results": [], "query": query, "filters": filter_dict, "total": 0},
-                isError=False
-            )
+            return CallToolResult(content=[TextContent(type="text", text=no_results_msg, annotations=Annotations(audience=["assistant"], priority=0.7))], structuredContent={"results": [], "query": query, "filters": filter_dict, "total": 0}, isError=False)
 
         # Format enhanced results for display
         output = [f"**Smart search results for '{query}':**"]
@@ -266,37 +228,10 @@ async def smart_search(query: str, filters: str = "", sort_by: str = "relevance"
             output.append(f"• **{game['name']}**{metacritic_str}{activity}\n" f"  Genres: {genres_str} | Platforms: {platform_str}\n" f"  Playtime: {game['playtime']:.1f}h" + (f" (recent: {game['recent_playtime']:.1f}h)" if game["recent_playtime"] > 0 else "") + (f"\n  Tags: {tags_str}" if tags_str else ""))
 
         # Return structured content with both text display and structured data
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text="\n".join(output),
-                    annotations=Annotations(audience=["user", "assistant"], priority=0.9)
-                )
-            ],
-            structuredContent={
-                "results": results,
-                "query": query,
-                "filters": filter_dict,
-                "sort_by": sort_by,
-                "total": len(results),
-                "limited": len(results) == limit
-            },
-            isError=False
-        )
+        return CallToolResult(content=[TextContent(type="text", text="\n".join(output), annotations=Annotations(audience=["user", "assistant"], priority=0.9))], structuredContent={"results": results, "query": query, "filters": filter_dict, "sort_by": sort_by, "total": len(results), "limited": len(results) == limit}, isError=False)
 
 
-@mcp.tool(
-    name="recommend_games",
-    title="Context-Aware Game Recommendations",
-    description="Intelligent game recommendations with interactive elicitation for missing parameters and context-aware filtering",
-    annotations=ToolAnnotations(
-        title="AI-Powered Recommendations",
-        readOnlyHint=True,
-        idempotentHint=False,  # Results may vary based on elicitation
-        openWorldHint=True  # Context parameter has many possible values
-    )
-)
+@mcp.tool(name="recommend_games", title="Context-Aware Game Recommendations", description="Intelligent game recommendations with interactive elicitation for missing parameters and context-aware filtering", annotations=ToolAnnotations(title="AI-Powered Recommendations", readOnlyHint=True, idempotentHint=False, openWorldHint=True))  # Results may vary based on elicitation  # Context parameter has many possible values
 async def recommend_games(context: str, parameters: str = "", use_play_history: bool = True, ctx: Context | None = None, user: str | None = None) -> CallToolResult:
     """
     Intelligent game recommendations with interactive elicitation for enhanced user experience.
@@ -324,16 +259,7 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
     # Resolve user
     user_result = resolve_user_for_tool(user, get_default_user_fallback)
     if "error" in user_result:
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=f"User error: {user_result['message']}",
-                    annotations=Annotations(audience=["assistant"], priority=0.9)
-                )
-            ],
-            isError=True
-        )
+        return CallToolResult(content=[TextContent(type="text", text=f"User error: {user_result['message']}", annotations=Annotations(audience=["assistant"], priority=0.9))], isError=True)
 
     user_steam_id = user_result["steam_id"]
 
@@ -343,83 +269,23 @@ async def recommend_games(context: str, parameters: str = "", use_play_history: 
         try:
             params = json.loads(parameters)
         except json.JSONDecodeError:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="Invalid parameters format. Please provide valid JSON.",
-                        annotations=Annotations(audience=["assistant"], priority=0.8)
-                    )
-                ],
-                isError=True
-            )
+            return CallToolResult(content=[TextContent(type="text", text="Invalid parameters format. Please provide valid JSON.", annotations=Annotations(audience=["assistant"], priority=0.8))], isError=True)
 
     # Enhanced elicitation with proper MCP JSON schemas
     if context == "family" and ctx and hasattr(ctx, "elicit"):
         if "age" not in params:
             try:
                 # Use proper MCP elicitation JSON schema instead of Pydantic
-                elicitation_result = await ctx.elicit(
-                    message="I need some information to find the best family-friendly games for you",
-                    requestedSchema={
-                        "type": "object",
-                        "properties": {
-                            "age": {
-                                "type": "integer",
-                                "title": "Child's Age",
-                                "description": "Age of the youngest player who will be playing",
-                                "minimum": 3,
-                                "maximum": 17
-                            },
-                            "players": {
-                                "type": "integer", 
-                                "title": "Number of Players",
-                                "description": "How many people will be playing together?",
-                                "minimum": 1,
-                                "maximum": 8,
-                                "default": 1
-                            },
-                            "content_concerns": {
-                                "type": "string",
-                                "title": "Content to Avoid",
-                                "description": "Any content you want to avoid (violence, scary themes, complex mechanics, etc.)",
-                                "enum": ["none", "violence", "scary", "complex", "violence_and_scary", "all_mature_content"],
-                                "enumNames": ["No specific concerns", "Violence", "Scary content", "Complex mechanics", "Violence and scary content", "All mature content"],
-                                "default": "none"
-                            }
-                        },
-                        "required": ["age"]
-                    }
-                )
+                elicitation_result = await ctx.elicit(message="I need some information to find the best family-friendly games for you", requestedSchema={"type": "object", "properties": {"age": {"type": "integer", "title": "Child's Age", "description": "Age of the youngest player who will be playing", "minimum": 3, "maximum": 17}, "players": {"type": "integer", "title": "Number of Players", "description": "How many people will be playing together?", "minimum": 1, "maximum": 8, "default": 1}, "content_concerns": {"type": "string", "title": "Content to Avoid", "description": "Any content you want to avoid (violence, scary themes, complex mechanics, etc.)", "enum": ["none", "violence", "scary", "complex", "violence_and_scary", "all_mature_content"], "enumNames": ["No specific concerns", "Violence", "Scary content", "Complex mechanics", "Violence and scary content", "All mature content"], "default": "none"}}, "required": ["age"]})
 
                 if elicitation_result.action == "accept" and elicitation_result.content:
                     params.update(elicitation_result.content)
                 elif elicitation_result.action == "decline":
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text="I understand you'd prefer not to provide that information. I'll use default family-friendly settings (age 8+).",
-                                annotations=Annotations(audience=["user"], priority=0.8)
-                            )
-                        ],
-                        structuredContent={"context": context, "elicitation_declined": True},
-                        isError=False
-                    )
+                    return CallToolResult(content=[TextContent(type="text", text="I understand you'd prefer not to provide that information. I'll use default family-friendly settings (age 8+).", annotations=Annotations(audience=["user"], priority=0.8))], structuredContent={"context": context, "elicitation_declined": True}, isError=False)
                 elif elicitation_result.action == "cancel":
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text="Request cancelled. You can try again anytime with recommend_games('family') or provide parameters directly.",
-                                annotations=Annotations(audience=["user"], priority=0.7)
-                            )
-                        ],
-                        structuredContent={"context": context, "elicitation_cancelled": True},
-                        isError=False
-                    )
+                    return CallToolResult(content=[TextContent(type="text", text="Request cancelled. You can try again anytime with recommend_games('family') or provide parameters directly.", annotations=Annotations(audience=["user"], priority=0.7))], structuredContent={"context": context, "elicitation_cancelled": True}, isError=False)
 
-            except Exception as e:
+            except Exception:
                 # Fallback gracefully if elicitation fails
                 params.setdefault("age", 8)
                 params.setdefault("players", 1)
