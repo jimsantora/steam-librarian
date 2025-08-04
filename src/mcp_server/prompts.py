@@ -108,14 +108,11 @@ def elicitation_guide(tool_name: str = None) -> list[base.Message]:
 
     if tool_name == "find_games_with_preferences":
         return [
-            base.UserMessage(TextContent(
-                type="text",
-                text="How does the preference elicitation work in find_games_with_preferences?",
-                annotations=Annotations(audience=["user"], priority=0.9)
-            )),
-            base.AssistantMessage(TextContent(
-                type="text",
-                text="""# Elicitation Guide: find_games_with_preferences
+            base.UserMessage(TextContent(type="text", text="How does the preference elicitation work in find_games_with_preferences?", annotations=Annotations(audience=["user"], priority=0.9))),
+            base.AssistantMessage(
+                TextContent(
+                    type="text",
+                    text="""# Elicitation Guide: find_games_with_preferences
 
 ## Overview
 This tool uses multi-step preference gathering to understand exactly what you want.
@@ -143,19 +140,17 @@ Tool: [Returns 5-10 games matching all preferences]
 - Answer preferences honestly for best results
 - You can skip questions by saying "no preference"
 - The tool remembers preferences within the session""",
-                annotations=Annotations(audience=["user"], priority=0.9)
-            ))
+                    annotations=Annotations(audience=["user"], priority=0.9),
+                )
+            ),
         ]
     elif tool_name == "recommend_games":
         return [
-            base.UserMessage(TextContent(
-                type="text",
-                text="How does elicitation work in recommend_games?",
-                annotations=Annotations(audience=["user"], priority=0.9)
-            )),
-            base.AssistantMessage(TextContent(
-                type="text",
-                text="""# Elicitation Guide: recommend_games
+            base.UserMessage(TextContent(type="text", text="How does elicitation work in recommend_games?", annotations=Annotations(audience=["user"], priority=0.9))),
+            base.AssistantMessage(
+                TextContent(
+                    type="text",
+                    text="""# Elicitation Guide: recommend_games
 
 ## Overview
 Uses context-aware elicitation for refinement and clarification.
@@ -183,19 +178,17 @@ Tool: [Returns building/crafting/exploration games]
 - Provide context and parameters upfront to minimize questions
 - Be specific with contexts like "mood:relaxing" vs just "relaxing"
 - Use get_tool_help("recommend_games") to see all valid contexts""",
-                annotations=Annotations(audience=["user"], priority=0.9)
-            ))
+                    annotations=Annotations(audience=["user"], priority=0.9),
+                )
+            ),
         ]
     else:
         return [
-            base.UserMessage(TextContent(
-                type="text",
-                text="What is preference elicitation and how does it work?",
-                annotations=Annotations(audience=["user"], priority=0.9)
-            )),
-            base.AssistantMessage(TextContent(
-                type="text",
-                text="""# Preference Elicitation in Steam Librarian
+            base.UserMessage(TextContent(type="text", text="What is preference elicitation and how does it work?", annotations=Annotations(audience=["user"], priority=0.9))),
+            base.AssistantMessage(
+                TextContent(
+                    type="text",
+                    text="""# Preference Elicitation in Steam Librarian
 
 ## What is Elicitation?
 Elicitation is an interactive process where tools ask follow-up questions to better understand your preferences and provide more accurate recommendations.
@@ -236,8 +229,9 @@ Tool: [Returns age-appropriate cooperative games without violence]
 - Use get_tool_help() to understand what information tools need
 
 Use elicitation_guide(tool_name="[specific_tool]") for detailed examples.""",
-                annotations=Annotations(audience=["user"], priority=0.9)
-            ))
+                    annotations=Annotations(audience=["user"], priority=0.9),
+                )
+            ),
         ]
 
 
@@ -249,41 +243,7 @@ def tool_usage_patterns(scenario: str = "discovery") -> list[base.Message]:
         scenario: Usage scenario - discovery, analysis, family, quick_play, etc.
     """
 
-    patterns = {
-        "discovery": {
-            "title": "Game Discovery Workflow",
-            "description": "Best practices for discovering new games to play",
-            "steps": [
-                "1. Start with get_library_insights('patterns') to understand your preferences",
-                "2. Use recommend_games('unplayed_gems') to find owned but unplayed games",
-                "3. Try smart_search() with natural language for specific moods",
-                "4. Use recommend_games('abandoned') to revisit started games"
-            ],
-            "example": "get_library_insights('patterns') → recommend_games('unplayed_gems') → smart_search('relaxing puzzle games')"
-        },
-        "family": {
-            "title": "Family Gaming Workflow",
-            "description": "Finding appropriate games for family play sessions",
-            "steps": [
-                "1. Use find_family_games(child_age=X) for age-appropriate filtering",
-                "2. Try recommend_games('family') with elicitation for detailed preferences",
-                "3. Use smart_search() with filters like 'coop family games'",
-                "4. Check individual games with library://games/{id} resources"
-            ],
-            "example": "find_family_games(8) → recommend_games('family') → smart_search('cooperative games', filters='no violence')"
-        },
-        "quick_play": {
-            "title": "Quick Session Workflow",
-            "description": "Finding games for limited time availability",
-            "steps": [
-                "1. Use find_quick_session_games(session_length='short/medium/long')",
-                "2. Try recommend_games('quick_session') with time parameters",
-                "3. Use smart_search() with 'arcade' or 'casual' filters",
-                "4. Sort by recent playtime to find familiar quick games"
-            ],
-            "example": "find_quick_session_games('short') → smart_search('arcade games', sort_by='recent')"
-        }
-    }
+    patterns = {"discovery": {"title": "Game Discovery Workflow", "description": "Best practices for discovering new games to play", "steps": ["1. Start with get_library_insights('patterns') to understand your preferences", "2. Use recommend_games('unplayed_gems') to find owned but unplayed games", "3. Try smart_search() with natural language for specific moods", "4. Use recommend_games('abandoned') to revisit started games"], "example": "get_library_insights('patterns') → recommend_games('unplayed_gems') → smart_search('relaxing puzzle games')"}, "family": {"title": "Family Gaming Workflow", "description": "Finding appropriate games for family play sessions", "steps": ["1. Use find_family_games(child_age=X) for age-appropriate filtering", "2. Try recommend_games('family') with elicitation for detailed preferences", "3. Use smart_search() with filters like 'coop family games'", "4. Check individual games with library://games/{id} resources"], "example": "find_family_games(8) → recommend_games('family') → smart_search('cooperative games', filters='no violence')"}, "quick_play": {"title": "Quick Session Workflow", "description": "Finding games for limited time availability", "steps": ["1. Use find_quick_session_games(session_length='short/medium/long')", "2. Try recommend_games('quick_session') with time parameters", "3. Use smart_search() with 'arcade' or 'casual' filters", "4. Sort by recent playtime to find familiar quick games"], "example": "find_quick_session_games('short') → smart_search('arcade games', sort_by='recent')"}}
 
     if scenario in patterns:
         pattern = patterns[scenario]
@@ -304,7 +264,7 @@ def tool_usage_patterns(scenario: str = "discovery") -> list[base.Message]:
 - Tools work better when you provide context upfront
 - Combine structured and natural language approaches"""
     else:
-        available = ', '.join(patterns.keys())
+        available = ", ".join(patterns.keys())
         content = f"""# Tool Usage Patterns
 
 Available scenarios: {available}
@@ -318,15 +278,4 @@ Available scenarios: {available}
 
 Use tool_usage_patterns(scenario='[name]') for specific workflows."""
 
-    return [
-        base.UserMessage(TextContent(
-            type="text",
-            text=f"Show me effective usage patterns for {scenario} scenarios",
-            annotations=Annotations(audience=["user"], priority=0.9)
-        )),
-        base.AssistantMessage(TextContent(
-            type="text",
-            text=content,
-            annotations=Annotations(audience=["user"], priority=0.9)
-        ))
-    ]
+    return [base.UserMessage(TextContent(type="text", text=f"Show me effective usage patterns for {scenario} scenarios", annotations=Annotations(audience=["user"], priority=0.9))), base.AssistantMessage(TextContent(type="text", text=content, annotations=Annotations(audience=["user"], priority=0.9)))]
