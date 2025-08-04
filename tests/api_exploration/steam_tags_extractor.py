@@ -6,10 +6,11 @@ Extracts user-generated tags from Steam store pages by parsing the HTML.
 This uses the official Steam store pages which contain tag data embedded in the HTML.
 """
 
-import requests
 import re
 import time
-from typing import List, Dict, Optional
+
+import requests
+
 
 class SteamTagsExtractor:
     def __init__(self):
@@ -30,7 +31,7 @@ class SteamTagsExtractor:
             time.sleep(self.rate_limit_delay - time_since_last)
         self.last_request_time = time.time()
 
-    def get_game_tags(self, app_id: int) -> Optional[List[str]]:
+    def get_game_tags(self, app_id: int) -> list[str] | None:
         """
         Extract user-generated tags for a specific Steam game.
         
@@ -41,23 +42,23 @@ class SteamTagsExtractor:
             List of tag strings, or None if extraction failed
         """
         self._rate_limit()
-        
+
         url = f"https://store.steampowered.com/app/{app_id}/"
-        
+
         try:
             response = self.session.get(url, timeout=30)
-            
+
             if response.status_code != 200:
                 print(f"Failed to get page for app {app_id}: status {response.status_code}")
                 return None
-                
+
             return self._extract_tags_from_html(response.text)
-            
+
         except Exception as e:
             print(f"Error fetching tags for app {app_id}: {e}")
             return None
 
-    def _extract_tags_from_html(self, html_content: str) -> List[str]:
+    def _extract_tags_from_html(self, html_content: str) -> list[str]:
         """
         Extract tags from Steam store page HTML.
         
@@ -68,19 +69,19 @@ class SteamTagsExtractor:
             List of tag strings
         """
         tags = []
-        
+
         # Pattern to match the tag links within the popular_tags section
         # Looking for: <a href="..." class="app_tag" ...>Tag Name</a>
         pattern = r'<a[^>]+class="app_tag"[^>]*>(.*?)</a>'
-        
+
         matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
-        
+
         for match in matches:
             # Clean up the tag text (remove extra whitespace and newlines)
             tag = re.sub(r'\s+', ' ', match.strip())
             if tag and tag != '+':  # Skip the '+' button
                 tags.append(tag)
-        
+
         return tags
 
     def test_tag_extraction(self):
@@ -92,34 +93,34 @@ class SteamTagsExtractor:
             (3224770, "Horse Life: Adventures"),  # The game from your example
             (1085660, "Destiny 2"),
         ]
-        
+
         print("Testing Steam tag extraction...\n")
-        
+
         for app_id, name in test_games:
             print(f"{'='*60}")
             print(f"Testing: {name} (App ID: {app_id})")
             print(f"{'='*60}")
-            
+
             tags = self.get_game_tags(app_id)
-            
+
             if tags:
                 print(f"Found {len(tags)} tags:")
                 for i, tag in enumerate(tags, 1):
                     print(f"  {i:2d}. {tag}")
-                    
+
                 # Show some interesting tags
                 interesting_tags = []
                 for tag in tags:
-                    if any(keyword in tag.lower() for keyword in 
+                    if any(keyword in tag.lower() for keyword in
                           ['roguelike', 'roguelite', 'arcade', 'puzzle', 'card', 'strategy']):
                         interesting_tags.append(tag)
-                
+
                 if interesting_tags:
                     print(f"\nInteresting gameplay tags: {', '.join(interesting_tags)}")
-                        
+
             else:
                 print("No tags found or extraction failed")
-            
+
             print()
 
 if __name__ == "__main__":

@@ -28,25 +28,25 @@ class TestEnhancedTools(unittest.TestCase):
             structuredContent={"games": [{"name": "Portal", "score": 95}], "total": 1},
             isError=False
         )
-        
+
         # Verify structure
         self.assertIsInstance(result.content, list)
         self.assertEqual(len(result.content), 1)
         self.assertIsInstance(result.content[0], TextContent)
         self.assertEqual(result.content[0].type, "text")
         self.assertEqual(result.content[0].text, "Test tool result")
-        
+
         # Verify annotations
         self.assertIsNotNone(result.content[0].annotations)
         self.assertEqual(result.content[0].annotations.audience, ["user"])
         self.assertEqual(result.content[0].annotations.priority, 0.9)
-        
+
         # Verify structured content
         self.assertIsNotNone(result.structuredContent)
         self.assertIn("games", result.structuredContent)
         self.assertIn("total", result.structuredContent)
         self.assertEqual(result.structuredContent["total"], 1)
-        
+
         # Verify error flag
         self.assertFalse(result.isError)
 
@@ -62,7 +62,7 @@ class TestEnhancedTools(unittest.TestCase):
             ],
             isError=True
         )
-        
+
         # Verify error structure
         self.assertTrue(error_result.isError)
         self.assertEqual(error_result.content[0].text, "User error: No default user configured")
@@ -76,7 +76,7 @@ class TestEnhancedTools(unittest.TestCase):
             idempotentHint=True,
             destructiveHint=False
         )
-        
+
         # Verify annotation structure
         self.assertEqual(annotations.title, "Advanced Game Discovery")
         self.assertTrue(annotations.readOnlyHint)
@@ -93,11 +93,11 @@ class TestEnhancedTools(unittest.TestCase):
                 priority=0.8
             )
         )
-        
+
         # Verify content structure
         self.assertEqual(content.type, "text")
         self.assertEqual(content.text, "Enhanced tool response with proper annotations")
-        
+
         # Verify annotations
         self.assertIsNotNone(content.annotations)
         self.assertEqual(content.annotations.audience, ["user", "assistant"])
@@ -124,14 +124,14 @@ class TestEnhancedTools(unittest.TestCase):
             "total": 1,
             "limited": False
         }
-        
+
         # Verify structure
         self.assertIn("results", search_results)
         self.assertIn("query", search_results)
         self.assertIn("total", search_results)
         self.assertIsInstance(search_results["results"], list)
         self.assertEqual(search_results["total"], 1)
-        
+
         # Verify game structure
         game = search_results["results"][0]
         required_fields = ["name", "metacritic", "platforms", "playtime", "genres"]
@@ -151,7 +151,7 @@ class TestEnhancedTools(unittest.TestCase):
             ],
             isError=True
         )
-        
+
         # Test JSON parsing error
         json_error = CallToolResult(
             content=[
@@ -163,7 +163,7 @@ class TestEnhancedTools(unittest.TestCase):
             ],
             isError=True
         )
-        
+
         # Test empty results (not an error)
         empty_results = CallToolResult(
             content=[
@@ -176,12 +176,12 @@ class TestEnhancedTools(unittest.TestCase):
             structuredContent={"results": [], "query": "nonexistent", "filters": {}, "total": 0},
             isError=False
         )
-        
+
         # Verify error patterns
         self.assertTrue(user_error.isError)
         self.assertTrue(json_error.isError)
         self.assertFalse(empty_results.isError)  # Empty results are not errors
-        
+
         # Verify all have proper annotations
         for result in [user_error, json_error, empty_results]:
             self.assertIsNotNone(result.content[0].annotations)
@@ -195,26 +195,26 @@ class TestEnhancedTools(unittest.TestCase):
             text="Here are your search results:",
             annotations=Annotations(audience=["user"], priority=0.9)
         )
-        
+
         # Assistant-facing content (medium priority)
         assistant_content = TextContent(
-            type="text", 
+            type="text",
             text="Query processed successfully",
             annotations=Annotations(audience=["assistant"], priority=0.6)
         )
-        
+
         # Mixed audience content (high priority)
         mixed_content = TextContent(
             type="text",
             text="Game recommendation results with detailed analysis",
             annotations=Annotations(audience=["user", "assistant"], priority=0.8)
         )
-        
+
         # Verify audience targeting
         self.assertEqual(user_content.annotations.audience, ["user"])
         self.assertEqual(assistant_content.annotations.audience, ["assistant"])
         self.assertEqual(mixed_content.annotations.audience, ["user", "assistant"])
-        
+
         # Verify priority ordering
         self.assertGreater(user_content.annotations.priority, assistant_content.annotations.priority)
         self.assertGreater(mixed_content.annotations.priority, assistant_content.annotations.priority)
@@ -240,11 +240,11 @@ class TestEnhancedTools(unittest.TestCase):
             },
             isError=False
         )
-        
+
         # Verify both content types are present
         self.assertIsNotNone(result.content)
         self.assertIsNotNone(result.structuredContent)
-        
+
         # Verify structured content matches unstructured count
         text_mentions = result.content[0].text.count("•")
         structured_count = len(result.structuredContent["results"])

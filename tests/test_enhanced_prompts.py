@@ -8,8 +8,8 @@ from pathlib import Path
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mcp.types import Annotations, TextContent, ResourceLink
 from mcp.server.fastmcp.prompts import base
+from mcp.types import Annotations, ResourceLink, TextContent
 
 
 class TestEnhancedPrompts(unittest.TestCase):
@@ -22,7 +22,7 @@ class TestEnhancedPrompts(unittest.TestCase):
             text="Test message with annotations",
             annotations=Annotations(audience=["user"], priority=0.9)
         )
-        
+
         # Verify structure
         self.assertEqual(content.type, "text")
         self.assertEqual(content.text, "Test message with annotations")
@@ -37,10 +37,10 @@ class TestEnhancedPrompts(unittest.TestCase):
             text="Test message",
             annotations=Annotations(audience=["user"], priority=0.8)
         )
-        
+
         # Create FastMCP message
         message = base.UserMessage(content)
-        
+
         # Verify message structure
         self.assertEqual(message.role, "user")
         self.assertEqual(message.content, content)
@@ -56,14 +56,14 @@ class TestEnhancedPrompts(unittest.TestCase):
             description="Test unplayed games resource",
             mimeType="application/json"
         )
-        
+
         # Verify structure
         self.assertEqual(str(resource.uri), "library://games/unplayed")
         self.assertEqual(resource.name, "unplayed_games")
         self.assertEqual(resource.description, "Test unplayed games resource")
         self.assertEqual(resource.mimeType, "application/json")
         self.assertEqual(resource.type, "resource_link")
-        
+
         # Test it works in FastMCP message
         message = base.UserMessage(resource)
         self.assertEqual(message.role, "user")
@@ -77,7 +77,7 @@ class TestEnhancedPrompts(unittest.TestCase):
             with self.subTest(audience=audience):
                 annotation = Annotations(audience=audience, priority=0.5)
                 self.assertEqual(annotation.audience, audience)
-        
+
         # Test priority range
         valid_priorities = [0.0, 0.5, 1.0]
         for priority in valid_priorities:
@@ -113,20 +113,20 @@ class TestEnhancedPrompts(unittest.TestCase):
                 )
             )
         ]
-        
+
         # Verify message structure
         self.assertEqual(len(messages), 3)
-        
+
         # First message - user with text content
         self.assertEqual(messages[0].role, "user")
         self.assertIsInstance(messages[0].content, TextContent)
         self.assertEqual(messages[0].content.annotations.audience, ["user"])
-        
+
         # Second message - assistant with text content
         self.assertEqual(messages[1].role, "assistant")
         self.assertIsInstance(messages[1].content, TextContent)
         self.assertEqual(messages[1].content.annotations.audience, ["assistant"])
-        
+
         # Third message - user with resource link
         self.assertEqual(messages[2].role, "user")
         self.assertIsInstance(messages[2].content, ResourceLink)
@@ -138,19 +138,19 @@ class TestEnhancedPrompts(unittest.TestCase):
             text="High priority message",
             annotations=Annotations(audience=["user"], priority=0.9)
         )
-        
+
         medium_priority = TextContent(
-            type="text", 
+            type="text",
             text="Medium priority message",
             annotations=Annotations(audience=["assistant"], priority=0.5)
         )
-        
+
         low_priority = TextContent(
             type="text",
-            text="Low priority message", 
+            text="Low priority message",
             annotations=Annotations(audience=["assistant"], priority=0.1)
         )
-        
+
         # Verify priority values
         self.assertGreater(high_priority.annotations.priority, medium_priority.annotations.priority)
         self.assertGreater(medium_priority.annotations.priority, low_priority.annotations.priority)
@@ -159,7 +159,7 @@ class TestEnhancedPrompts(unittest.TestCase):
         """Test understanding of how FastMCP should handle prompt arguments."""
         # Test that our enhanced prompts have proper docstring argument documentation
         # This helps FastMCP auto-generate PromptArgument objects
-        
+
         def sample_prompt(child_age: int = 8, game_type: str = "family") -> list[base.Message]:
             """Sample prompt for testing.
             
@@ -168,17 +168,17 @@ class TestEnhancedPrompts(unittest.TestCase):
                 game_type: Type of games to recommend (default: "family")
             """
             return []
-        
+
         # Verify function has proper signature and docstring
         import inspect
         sig = inspect.signature(sample_prompt)
-        
+
         # Check parameters
         self.assertIn('child_age', sig.parameters)
         self.assertIn('game_type', sig.parameters)
         self.assertEqual(sig.parameters['child_age'].default, 8)
         self.assertEqual(sig.parameters['game_type'].default, "family")
-        
+
         # Check docstring format
         self.assertIn("Args:", sample_prompt.__doc__)
         self.assertIn("child_age:", sample_prompt.__doc__)
@@ -203,20 +203,20 @@ class TestEnhancedPrompts(unittest.TestCase):
                 ),
                 base.AssistantMessage(
                     TextContent(
-                        type="text", 
+                        type="text",
                         text=f"I'll find age-appropriate games for a {child_age}-year-old using our family-safe filtering system.",
                         annotations=Annotations(audience=["assistant"], priority=0.8)
                     )
                 )
             ]
-        
+
         # Test prompt execution
         messages = enhanced_family_games(10)
-        
+
         self.assertEqual(len(messages), 2)
         self.assertIn("10-year-old", messages[0].content.text)
         self.assertIn("10-year-old", messages[1].content.text)
-        
+
         # Verify annotations are preserved
         self.assertEqual(messages[0].content.annotations.audience, ["user"])
         self.assertEqual(messages[1].content.annotations.audience, ["assistant"])

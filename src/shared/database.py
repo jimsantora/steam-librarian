@@ -351,7 +351,7 @@ def handle_game_not_found(game_identifier: str) -> dict[str, Any]:
 
 def handle_multiple_users(users: list) -> dict[str, Any]:
     """Standard response for multiple users scenario"""
-    return create_error_response("MULTIPLE_USERS_FOUND", "Multiple users found. Please specify which user by Steam ID or persona name.", {"available_users": [{"steam_id": user.steam_id, "persona_name": user.persona_name or "Unknown"} for user in users]})
+    return create_error_response("MULTIPLE_USERS_FOUND", "Multiple users found. Please specify which user by Steam ID or persona name using the 'user' parameter in your tool call (e.g., user='76561198xxx' or user='username'). If no user is specified, tools will try to auto-select when there's only one user. Use the library://users resource to see all available users with their Steam IDs and usernames.", {"available_users": [{"steam_id": user.steam_id, "persona_name": user.persona_name or "Unknown"} for user in users]})
 
 
 def resolve_user_identifier(user_identifier: str, session: Session | None = None) -> str | None:
