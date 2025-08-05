@@ -106,6 +106,54 @@ mcpServer:
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
+
+# Tools-Only MCP Server Configuration
+toolsServer:
+  enabled: true
+  image:
+    repository: ghcr.io/jimsantora/steam-librarian/tools-server
+    tag: 1.5.4
+    pullPolicy: IfNotPresent
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+    annotations: {}
+  
+  # Resources
+  resources: {}
+    # limits:
+    #   cpu: 300m
+    #   memory: 256Mi
+    # requests:
+    #   cpu: 50m
+    #   memory: 64Mi
+  
+  # Environment variables
+  env:
+    mcpHost: "0.0.0.0"
+    mcpPort: 8001
+    debug: false
+    defaultUser: "default"
+  
+  # Probes
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
   
   # Node selector
   nodeSelector: {}

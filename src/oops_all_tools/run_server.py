@@ -16,21 +16,14 @@ import signal
 import sys
 
 # Add parent directories to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from . import SERVER_NAME
 from .config import config
 from .server import mcp
 
 # Configure logging
-logging.basicConfig(
-    level=logging.DEBUG if config.debug else logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('steam_librarian_tools.log') if not config.debug else logging.NullHandler()
-    ]
-)
+logging.basicConfig(level=logging.DEBUG if config.debug else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("steam_librarian_tools.log") if not config.debug else logging.NullHandler()])
 
 logger = logging.getLogger(SERVER_NAME)
 
@@ -76,6 +69,7 @@ def validate_environment():
     # Check port availability
     try:
         import socket
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((config.host, config.port))
     except OSError as e:
@@ -112,12 +106,7 @@ async def run_server():
         logger.info(f"Server capabilities: {len([name for name in dir(tools) if not name.startswith('_')])} tools available")
 
         # Run the FastMCP server
-        await mcp.run(
-            transport="sse",  # Server-Sent Events transport
-            host=config.host,
-            port=config.port,
-            raise_exceptions=config.debug
-        )
+        await mcp.run(transport="sse", host=config.host, port=config.port, raise_exceptions=config.debug)  # Server-Sent Events transport
 
     except KeyboardInterrupt:
         logger.info("Server stopped by user")

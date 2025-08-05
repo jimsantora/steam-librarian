@@ -13,6 +13,8 @@ help:
 	@echo ""
 	@echo "Kubernetes/Helm targets:"
 	@echo "  make helm-install    - Install with Helm (requires values-override.yaml)"
+	@echo "  make helm-install-both - Install both MCP servers with Helm"
+	@echo "  make helm-upgrade-both - Upgrade both MCP servers with Helm"
 	@echo "  make helm-uninstall  - Uninstall Helm release"
 	@echo "  make helm-lint       - Lint Helm chart"
 	@echo "  make helm-validate   - Validate Helm chart with kubeconform"
@@ -98,6 +100,28 @@ helm-install:
 helm-uninstall:
 	@echo "Uninstalling Steam Librarian..."
 	helm uninstall steam-librarian
+
+helm-install-both:
+	@echo "Installing both MCP servers with Helm..."
+	@if [ -f deploy/helm/steam-librarian/values-override.yaml ]; then \
+		helm install steam-librarian deploy/helm/steam-librarian -f deploy/helm/steam-librarian/values-override.yaml \
+			--set mcpServer.enabled=true \
+			--set toolsServer.enabled=true; \
+	else \
+		echo "ERROR: Please create deploy/helm/steam-librarian/values-override.yaml with your Steam credentials"; \
+		exit 1; \
+	fi
+
+helm-upgrade-both:
+	@echo "Upgrading both MCP servers with Helm..."
+	@if [ -f deploy/helm/steam-librarian/values-override.yaml ]; then \
+		helm upgrade steam-librarian deploy/helm/steam-librarian -f deploy/helm/steam-librarian/values-override.yaml \
+			--set mcpServer.enabled=true \
+			--set toolsServer.enabled=true; \
+	else \
+		echo "ERROR: Please create deploy/helm/steam-librarian/values-override.yaml with your Steam credentials"; \
+		exit 1; \
+	fi
 
 # Development targets
 lint:
@@ -194,3 +218,22 @@ test-tools:
 health-tools:
 	@echo "Checking tools-only server health..."
 	@curl -f http://localhost:8001/health || echo "Server not responding on port 8001"
+
+# Docker targets for tools server
+build-docker-tools:
+	@echo "Building tools-only Docker image..."
+	docker build -t steam-librarian-tools:latest -f deploy/docker/Dockerfile.oops_all_tools .
+
+run-both-servers:
+	@echo "Starting both MCP servers with Docker Compose..."
+	cd deploy/docker && docker-compose up -d
+
+stop-both-servers:
+	@echo "Stopping both MCP servers..."
+	cd deploy/docker && docker-compose down
+
+rebuild-tools-docker:
+	@echo "Stopping services, rebuilding tools server, and restarting..."
+	cd deploy/docker && docker-compose down
+	docker build --no-cache --pull -f deploy/docker/Dockerfile.oops_all_tools -t steam-librarian-tools:latest .
+	cd deploy/docker && docker-compose up -d mcp-server-tools

@@ -49,6 +49,32 @@ services:
       retries: 3
       start_period: 40s
 
+  # Tools-Only MCP Server - simplified version for maximum client compatibility
+  mcp-server-tools:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.oops_all_tools
+    environment:
+      - DATABASE_URL=sqlite:////data/steam_library.db
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8001
+      - DEBUG=false
+      - DEFAULT_USER=default
+    volumes:
+      - steam-data:/data
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    depends_on:
+      - volume-permissions
+      - fetcher
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Optional: Run fetcher periodically using a cron-like service
   fetcher-cron:
     build:
