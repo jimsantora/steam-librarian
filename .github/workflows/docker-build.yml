@@ -10,6 +10,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME_FETCHER: ${{ github.repository }}/fetcher
   IMAGE_NAME_MCP: ${{ github.repository }}/mcp-server
+  IMAGE_NAME_TOOLS: ${{ github.repository }}/tools-server
 
 jobs:
   build-and-push:
@@ -59,6 +60,19 @@ jobs:
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Extract metadata for Tools server
+      id: meta-tools
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TOOLS }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
     - name: Build and push fetcher image
       uses: docker/build-push-action@v5
       with:
@@ -83,6 +97,18 @@ jobs:
         cache-to: type=gha,mode=max
         platforms: linux/amd64,linux/arm64
 
+    - name: Build and push Tools server image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/docker/Dockerfile.oops_all_tools
+        push: ${{ github.ref_type == 'tag' }}
+        tags: ${{ steps.meta-tools.outputs.tags }}
+        labels: ${{ steps.meta-tools.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
     - name: Generate image list
       if: github.ref_type == 'tag'
       run: |
@@ -96,4 +122,9 @@ jobs:
         echo "### MCP Server Image Tags:" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "${{ steps.meta-mcp.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Tools Server Image Tags:" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "${{ steps.meta-tools.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY

@@ -21,6 +21,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME_FETCHER: ${{ github.repository }}/fetcher
   IMAGE_NAME_MCP: ${{ github.repository }}/mcp-server
+  IMAGE_NAME_TOOLS: ${{ github.repository }}/tools-server
 
 jobs:
   build:
@@ -69,6 +70,17 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Build and push Tools server image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/docker/Dockerfile.oops_all_tools
+        push: ${{ inputs.push }}
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TOOLS }}:${{ inputs.tag }}
+        platforms: ${{ inputs.platforms }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
     - name: Summary
       run: |
         echo "## Manual Build Complete" >> $GITHUB_STEP_SUMMARY
@@ -81,4 +93,5 @@ jobs:
           echo "### Images" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FETCHER }}:${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME_MCP }}:${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TOOLS }}:${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
         fi
