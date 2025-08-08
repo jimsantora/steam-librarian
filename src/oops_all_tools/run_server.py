@@ -100,7 +100,9 @@ def run_server():
 
     try:
         # Import tools to register them with the server
-        from oops_all_tools import tools  # This registers all the @mcp.tool() decorated functions
+        from oops_all_tools import (
+            tools,  # This registers all the @mcp.tool() decorated functions
+        )
 
         logger.info("Tools loaded successfully")
         logger.info(f"Server capabilities: {len([name for name in dir(tools) if not name.startswith('_')])} tools available")
