@@ -9,7 +9,7 @@ limited MCP feature support.
 Server runs on port 8001 (vs 8000 for the full-featured server).
 """
 
-__version__ = "1.0.0"
+__version__ = "1.6.2"
 __author__ = "Steam Librarian Team"
 __description__ = "Tools-only MCP server for Steam library management"
 

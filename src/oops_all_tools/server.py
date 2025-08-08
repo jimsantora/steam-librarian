@@ -7,8 +7,8 @@ from sqlalchemy import create_engine, text
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from . import SERVER_NAME
-from .config import config
+from oops_all_tools import SERVER_NAME
+from oops_all_tools.config import config
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG if config.debug else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

@@ -43,6 +43,7 @@ jobs:
         VERSION="${VERSION#v}"  # Remove 'v' prefix
         sed -i "s/^__version__ = .*/__version__ = \"${VERSION}\"/" src/mcp_server/__init__.py
         sed -i "s/^__version__ = .*/__version__ = \"${VERSION}\"/" src/fetcher/__init__.py
+        sed -i "s/^__version__ = .*/__version__ = \"${VERSION}\"/" src/oops_all_tools/__init__.py
 
     - name: Package Helm chart
       run: |
@@ -58,26 +59,56 @@ jobs:
         
         This release includes the following Docker images:
         
-        - Fetcher: \`ghcr.io/${{ github.repository }}/fetcher:${{ steps.get_version.outputs.VERSION }}\`
-        - MCP Server: \`ghcr.io/${{ github.repository }}/mcp-server:${{ steps.get_version.outputs.VERSION }}\`
+        - **Fetcher**: \`ghcr.io/${{ github.repository }}/fetcher:${{ steps.get_version.outputs.VERSION }}\`
+        - **Full MCP Server** (port 8000): \`ghcr.io/${{ github.repository }}/mcp-server:${{ steps.get_version.outputs.VERSION }}\`
+        - **Tools-Only Server** (port 8001): \`ghcr.io/${{ github.repository }}/tools-server:${{ steps.get_version.outputs.VERSION }}\`
+        
+        ### Architecture
+        
+        This version features a **dual-server architecture**:
+        
+        - **Full MCP Server** (port 8000): Complete MCP implementation with tools, resources, prompts, and planned completions/elicitations
+        - **Tools-Only Server** (port 8001): Simplified server with only tools for maximum client compatibility (Claude Desktop/Code)
+        
+        Choose the server that best fits your client's MCP support level.
         
         ### Installation
         
         #### Docker Compose
+        
+        **Run both servers:**
         \`\`\`bash
+        make run-both-servers
+        # Or manually:
         cd deploy/docker
         docker-compose pull
         docker-compose up -d
         \`\`\`
         
-        #### Helm
+        **Run individual servers:**
         \`\`\`bash
-        helm repo add steam-librarian https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}
-        helm install steam-librarian steam-librarian/steam-librarian \\
+        # Full MCP server only (port 8000)
+        make run-docker
+        
+        # Tools-only server only (port 8001) 
+        make run-docker-tools
+        \`\`\`
+        
+        #### Helm
+        
+        **Install both servers:**
+        \`\`\`bash
+        helm install steam-librarian deploy/helm/steam-librarian \\
           --set steam.steamId=YOUR_STEAM_ID \\
           --set steam.apiKey=YOUR_API_KEY \\
           --set fetcher.image.tag=${{ steps.get_version.outputs.VERSION }} \\
-          --set mcpServer.image.tag=${{ steps.get_version.outputs.VERSION }}
+          --set mcpServer.image.tag=${{ steps.get_version.outputs.VERSION }} \\
+          --set toolsServer.image.tag=${{ steps.get_version.outputs.VERSION }}
+        \`\`\`
+        
+        **Or use Make targets:**
+        \`\`\`bash
+        make helm-install-both
         \`\`\`
         
         ### What's Changed
@@ -132,7 +163,10 @@ jobs:
           This PR updates the default image tags in the Helm chart to use the newly released version.
           
           - Updates fetcher image tag to `${{ steps.get_version.outputs.VERSION }}`
-          - Updates MCP server image tag to `${{ steps.get_version.outputs.VERSION }}`
+          - Updates full MCP server image tag to `${{ steps.get_version.outputs.VERSION }}`
+          - Updates tools-only server image tag to `${{ steps.get_version.outputs.VERSION }}`
           - Updates repository URLs to use ghcr.io
+          
+          **Dual-Server Architecture**: This release includes both the full MCP server (port 8000) and tools-only server (port 8001) for maximum compatibility.
         branch: update-helm-${{ steps.get_version.outputs.VERSION }}
         delete-branch: true

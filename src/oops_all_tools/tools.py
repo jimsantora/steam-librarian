@@ -28,8 +28,8 @@ from shared.database import (
     resolve_user_for_tool,
 )
 
-from .config import config, get_default_user_fallback
-from .server import mcp
+from oops_all_tools.config import config, get_default_user_fallback
+from oops_all_tools.server import mcp
 
 
 def is_natural_language_query(query: str) -> bool:
