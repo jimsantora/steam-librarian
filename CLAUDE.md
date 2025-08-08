@@ -8,9 +8,9 @@ Steam Librarian is an intelligent MCP (Model Context Protocol) server that provi
 
 ## Key Commands
 
-### Running the Server
+### Running the Servers
 ```bash
-# Run the MCP server (production mode)
+# Run the full MCP server (production mode, port 8000)
 python src/mcp_server/run_server.py
 
 # Run as module
@@ -18,6 +18,14 @@ python -m mcp_server.run_server
 
 # Development mode with debug logging
 DEBUG=true python src/mcp_server/run_server.py
+
+# Run the tools-only MCP server (port 8001, better client compatibility)
+python src/oops_all_tools/run_server.py
+make run-tools  # Alternative using Makefile
+
+# Development mode for tools-only server
+DEBUG=true python src/oops_all_tools/run_server.py
+make dev-tools  # Alternative using Makefile
 ```
 
 ### Data Fetching
@@ -40,18 +48,42 @@ black src                         # Format code
 make test                         # Basic import test
 make test-unit                    # Run unit tests
 make test-integration             # Integration tests
-make test-full                    # All tests
+make test-functional              # Functional tests for tools
+make test-full                    # All tests (unit + functional + integration)
+
+# MCP-specific testing:
+make test-mcp-tools               # Test MCP tools compliance
+make test-mcp-resources           # Test MCP resources
+make test-mcp-prompts             # Test MCP prompts
+make test-mcp-full                # Complete MCP test suite with report
+
+# Tools-only server testing:
+make test-tools                   # Test tools-only MCP server
+make health-tools                 # Check tools-only server health
 ```
 
 ### Docker & Deployment
 ```bash
-# Docker
+# Docker - Full server
 make build-docker
 make run-docker
+make stop-docker
+make rebuild-mcp-docker           # Rebuild MCP server without cache
+make rebuild-all-docker           # Rebuild all containers without cache
+
+# Docker - Tools-only server
+make build-docker-tools           # Build tools-only Docker image
+make run-both-servers             # Run both MCP servers
+make stop-both-servers            # Stop both servers
+make rebuild-tools-docker         # Rebuild tools server
 
 # Kubernetes/Helm
-make helm-lint
-make helm-validate
+make helm-lint                    # Lint Helm chart
+make helm-validate                # Validate with kubeconform
+make helm-install                 # Install single server
+make helm-install-both            # Install both MCP servers
+make helm-upgrade-both            # Upgrade both servers
+make helm-uninstall               # Uninstall release
 helm install steam-librarian deploy/helm/steam-librarian -f values-override.yaml
 
 # Manual CronJob trigger in Kubernetes
@@ -60,34 +92,53 @@ kubectl create job --from=cronjob/steam-librarian-fetcher manual-fetch-$(date +%
 
 ## Architecture
 
-### Core Components (Simplified Structure)
+### Core Components
 
-1. **MCP Server (src/mcp_server/)**
+1. **Full MCP Server (src/mcp_server/)** - Port 8000
    - `server.py`: FastMCP server instance with health endpoints
    - `run_server.py`: Production startup script with signal handling
    - `config.py`: Simple configuration with environment variables
    - `tools.py`: **Consolidated MCP tools** (all tools in single file)
    - `resources.py`: **Consolidated MCP resources** (all resources in single file)
    - `prompts.py`: **Consolidated MCP prompts** (all prompts in single file)
-   - HTTP transport on port 8000 with streamable responses
+   - HTTP transport with streamable responses
+   - Supports all MCP features: tools, resources, prompts, completions, elicitations, sampling
 
-2. **Database (src/shared/database.py)**
+2. **Tools-Only Server (src/oops_all_tools/)** - Port 8001
+   - **Purpose**: Maximum compatibility with Claude Desktop/Code clients
+   - `server.py`: Simplified FastMCP server
+   - `tools.py`: ~20 focused tools (all functionality via tools)
+   - `prompts.py`: Simple usage examples
+   - `config.py`: Minimal configuration
+   - No resources, completions, elicitations, or sampling
+   - Better compatibility with limited MCP clients
+
+3. **Database (src/shared/database.py)**
    - SQLAlchemy models: UserProfile, Game, Genre, Developer, Publisher, Review, Friend, UserGame
    - SQLite database with proper relationships and indexes
    - **Critical insight**: Genres (15 broad types) vs Categories (53 specific features)
    - Personal library focus with default user handling
 
-3. **Steam Data Fetcher (src/fetcher/)**
+4. **Steam Data Fetcher (src/fetcher/)**
    - `steam_library_fetcher.py`: Fetches Steam library data via Steam Web API
    - Populates SQLite database with comprehensive game metadata
 
 ## Important Technical Notes
 
 ### Recent Architectural Changes
+- **Dual-server architecture**: Added tools-only server alongside full MCP server for client compatibility
 - **Simplified from modular to consolidated**: Tools, resources, and prompts moved from multiple modules to single files
 - **Removed complex subsystems**: Cache, monitoring, services, enhanced user context, and error handling layers removed
 - **Focus on core MCP features**: Tools, resources, prompts, with planned sampling, elicitation, and completions
 - **Personal library emphasis**: All tools default to user's personal Steam library
+
+### Server Compatibility Matrix
+| Client | Full Server (8000) | Tools Server (8001) |
+|--------|-------------------|---------------------|
+| Claude Desktop | ⚠️ Partial | ✅ Full |
+| Claude Code | ⚠️ Partial | ✅ Full |
+| MCP-compatible tools | ✅ Full | ✅ Tools only |
+| Custom integrations | ✅ Full | ✅ Tools only |
 
 ### Database Architecture Intelligence
 **Critical Discovery**: Steam uses a two-tier classification system:
@@ -202,10 +253,12 @@ def resource_name(param: str) -> str:
 - Use the genre vs category intelligence for smart filtering
 
 ### Key Files to Understand
-- `src/mcp_server/tools.py` - All MCP tools consolidated here
-- `src/mcp_server/resources.py` - All MCP resources consolidated here
+- `src/mcp_server/tools.py` - All MCP tools for full server
+- `src/mcp_server/resources.py` - All MCP resources for full server
+- `src/oops_all_tools/tools.py` - ~20 focused tools for compatibility server
 - `src/shared/database.py` - SQLAlchemy models and database utilities
 - `ai_specs/mcp_enhancement_plan_v2.md` - Comprehensive enhancement roadmap
+- `ai_specs/oops_all_tools_plan.md` - Tools-only server implementation plan
 
 ### Docker Database Access
 ```bash
