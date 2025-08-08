@@ -1,0 +1,47 @@
+# Dockerfile for Tools-Only MCP Server
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better layer caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ /app/src/
+
+# Create directories for database volume and cache
+RUN mkdir -p /data /app/cache && \
+    chown -R nobody:nogroup /app/cache && \
+    chmod 755 /app/cache
+
+# Set environment for Python
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
+
+# Switch to nobody user
+USER nobody
+
+# Default environment variables (can be overridden)
+ENV DATABASE_URL=sqlite:////data/steam_library.db
+ENV MCP_HOST=0.0.0.0
+ENV MCP_PORT=8001
+ENV DEBUG=false
+ENV DEFAULT_USER=default
+
+# Expose port for HTTP transport (different from main server)
+EXPOSE 8001
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')" || exit 1
+
+# Run the tools-only MCP server
+CMD ["python", "src/oops_all_tools/run_server.py"]

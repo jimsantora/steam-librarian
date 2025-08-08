@@ -1,0 +1,90 @@
+{{- if .Values.toolsServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "steam-librarian.fullname" . }}-tools
+  labels:
+    {{- include "steam-librarian.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "steam-librarian.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: tools-server
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.toolsServer.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "steam-librarian.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: tools-server
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "steam-librarian.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.toolsServer.podSecurityContext | nindent 8 }}
+      containers:
+        - name: tools-server
+          securityContext:
+            {{- toYaml .Values.toolsServer.securityContext | nindent 12 }}
+          image: "{{ .Values.toolsServer.image.repository }}:{{ .Values.toolsServer.image.tag }}"
+          imagePullPolicy: {{ .Values.toolsServer.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.toolsServer.service.targetPort }}
+              protocol: TCP
+          {{- if .Values.toolsServer.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.toolsServer.livenessProbe.httpGet.path }}
+              port: {{ .Values.toolsServer.livenessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.toolsServer.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.toolsServer.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.toolsServer.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.toolsServer.readinessProbe.httpGet.path }}
+              port: {{ .Values.toolsServer.readinessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.toolsServer.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.toolsServer.readinessProbe.periodSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.toolsServer.resources | nindent 12 }}
+          env:
+            - name: DATABASE_URL
+              value: "sqlite:////data/steam_library.db"
+            - name: MCP_HOST
+              value: {{ .Values.toolsServer.env.mcpHost | quote }}
+            - name: MCP_PORT
+              value: {{ .Values.toolsServer.env.mcpPort | quote }}
+            - name: DEBUG
+              value: {{ .Values.toolsServer.env.debug | quote }}
+            - name: DEFAULT_USER
+              value: {{ .Values.toolsServer.env.defaultUser | quote }}
+          volumeMounts:
+            - name: steam-data
+              mountPath: /data
+      volumes:
+        - name: steam-data
+          persistentVolumeClaim:
+            claimName: {{ include "steam-librarian.pvcName" . }}
+      {{- with .Values.toolsServer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.toolsServer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.toolsServer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
