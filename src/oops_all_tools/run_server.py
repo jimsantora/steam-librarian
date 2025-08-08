@@ -15,12 +15,12 @@ import os
 import signal
 import sys
 
-# Add parent directories to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+# Add src to path for imports
+sys.path.insert(0, str(os.path.join(os.path.dirname(__file__), "..")))
 
-from . import SERVER_NAME
-from .config import config
-from .server import mcp
+from oops_all_tools import SERVER_NAME
+from oops_all_tools.config import config
+from oops_all_tools.server import mcp
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG if config.debug else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("steam_librarian_tools.log") if not config.debug else logging.NullHandler()])
@@ -91,7 +91,7 @@ def validate_environment():
     return True
 
 
-async def run_server():
+def run_server():
     """Run the MCP server with proper error handling."""
     logger.info(f"Starting {SERVER_NAME} on {config.host}:{config.port}")
     logger.info(f"Debug mode: {config.debug}")
@@ -100,13 +100,15 @@ async def run_server():
 
     try:
         # Import tools to register them with the server
-        from . import tools  # This registers all the @mcp.tool() decorated functions
+        from oops_all_tools import (
+            tools,  # This registers all the @mcp.tool() decorated functions
+        )
 
         logger.info("Tools loaded successfully")
         logger.info(f"Server capabilities: {len([name for name in dir(tools) if not name.startswith('_')])} tools available")
 
         # Run the FastMCP server
-        await mcp.run(transport="sse", host=config.host, port=config.port, raise_exceptions=config.debug)  # Server-Sent Events transport
+        mcp.run(transport="streamable-http")
 
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
@@ -119,7 +121,7 @@ async def run_server():
     return 0
 
 
-async def main():
+def main():
     """Main entry point with signal handling and error recovery."""
     shutdown_handler = GracefulShutdown()
     shutdown_handler.setup_signals()
@@ -130,10 +132,9 @@ async def main():
 
     # Run server with graceful shutdown handling
     try:
-        shutdown_handler.server_task = asyncio.create_task(run_server())
-        return await shutdown_handler.server_task
+        return run_server()
 
-    except asyncio.CancelledError:
+    except KeyboardInterrupt:
         logger.info("Server shutdown completed")
         return 0
     except Exception as e:
@@ -145,7 +146,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        exit_code = asyncio.run(main())
+        exit_code = main()
         sys.exit(exit_code)
     except KeyboardInterrupt:
         logger.info("Server stopped")

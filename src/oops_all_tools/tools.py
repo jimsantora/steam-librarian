@@ -18,6 +18,8 @@ from sqlalchemy.orm import joinedload
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
+from oops_all_tools.config import config, get_default_user_fallback
+from oops_all_tools.server import mcp
 from shared.database import (
     Category,
     Game,
@@ -27,9 +29,6 @@ from shared.database import (
     get_db,
     resolve_user_for_tool,
 )
-
-from .config import config, get_default_user_fallback
-from .server import mcp
 
 
 def is_natural_language_query(query: str) -> bool:
